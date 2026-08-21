@@ -63,20 +63,24 @@ export default function MedicationManager({ activeProfile }) {
     fetchMedicationsFromBackend(activeProfile.id).then(backendMeds => {
       if (isMounted && backendMeds && backendMeds.length > 0) {
         // Normalize
-        const normalized = backendMeds.map(m => ({
-          id: m.id,
-          name: m.name,
-          dosage: m.dosage,
-          genericName: m.genericName || m.name,
-          timeSlot: m.timing || 'Morning (8:00 AM)',
-          mealTiming: m.foodInstruction || 'After Food',
-          purpose: m.prescribedFor || 'Health support',
-          prescribedBy: m.doctorName || 'Consulting Physician',
-          remainingDays: m.remainingDays || 15,
-          totalPills: m.totalPills || 30,
-          remainingPills: m.remainingPills || 15,
-          takenToday: m.takenToday || false
-        }));
+        const normalized = backendMeds.map(m => {
+          const isTaken = Boolean(m.takenToday || m.status === 'taken');
+          return {
+            id: m.id,
+            name: m.name,
+            dosage: m.dosage,
+            genericName: m.genericName || m.name,
+            timeSlot: m.timing || m.timeSlot || 'Morning (8:00 AM)',
+            mealTiming: m.foodInstruction || m.mealTiming || 'After Food',
+            purpose: m.prescribedFor || m.purpose || 'Health support',
+            prescribedBy: m.doctorName || m.prescribedBy || 'Consulting Physician',
+            remainingDays: m.remainingDays || 15,
+            totalPills: m.totalPills || 30,
+            remainingPills: m.remainingPills || 15,
+            takenToday: isTaken,
+            status: isTaken ? 'taken' : 'pending'
+          };
+        });
         setMedications(normalized);
 
         // Check interactions on Java backend
@@ -106,11 +110,13 @@ export default function MedicationManager({ activeProfile }) {
     toggleMedicationBackend(id);
     setMedications(prev => prev.map(m => {
       if (m.id === id) {
-        const nextTaken = !m.takenToday;
+        const currentTaken = Boolean(m.takenToday || m.status === 'taken');
+        const nextTaken = !currentTaken;
         return {
           ...m,
           takenToday: nextTaken,
-          remainingPills: nextTaken ? Math.max(0, m.remainingPills - 1) : m.remainingPills + 1
+          status: nextTaken ? 'taken' : 'pending',
+          remainingPills: nextTaken ? Math.max(0, (m.remainingPills || 1) - 1) : (m.remainingPills || 0) + 1
         };
       }
       return m;
@@ -281,7 +287,7 @@ export default function MedicationManager({ activeProfile }) {
 
             <div className="divide-y divide-slate-100">
               {medications.map((med) => {
-                const isTaken = med.status === 'taken';
+                const isTaken = Boolean(med.takenToday || med.status === 'taken');
                 
                 return (
                   <div

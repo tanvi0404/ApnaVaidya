@@ -888,10 +888,11 @@ public class ApnaVaidyaServer {
     private static String medicationToJson(MedicationItem m) {
         return String.format(
             Locale.US,
-            "{\"id\":\"%s\",\"profileId\":\"%s\",\"name\":\"%s\",\"genericName\":\"%s\",\"dosage\":\"%s\",\"frequency\":\"%s\",\"timing\":\"%s\",\"foodInstruction\":\"%s\",\"prescribedFor\":\"%s\",\"doctorName\":\"%s\",\"remainingDays\":%d,\"totalPills\":%d,\"remainingPills\":%d,\"takenToday\":%b}",
+            "{\"id\":\"%s\",\"profileId\":\"%s\",\"name\":\"%s\",\"genericName\":\"%s\",\"dosage\":\"%s\",\"frequency\":\"%s\",\"timing\":\"%s\",\"foodInstruction\":\"%s\",\"prescribedFor\":\"%s\",\"doctorName\":\"%s\",\"remainingDays\":%d,\"totalPills\":%d,\"remainingPills\":%d,\"takenToday\":%b,\"status\":\"%s\"}",
             m.getId(), m.getProfileId(), escapeJson(m.getName()), escapeJson(m.getGenericName()), escapeJson(m.getDosage()),
             escapeJson(m.getFrequency()), escapeJson(m.getTiming()), escapeJson(m.getFoodInstruction()), escapeJson(m.getPrescribedFor()),
-            escapeJson(m.getDoctorName()), m.getRemainingDays(), m.getTotalPills(), m.getRemainingPills(), m.isTakenToday()
+            escapeJson(m.getDoctorName()), m.getRemainingDays(), m.getTotalPills(), m.getRemainingPills(), m.isTakenToday(),
+            m.isTakenToday() ? "taken" : "pending"
         );
     }
 
