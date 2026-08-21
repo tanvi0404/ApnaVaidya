@@ -9,13 +9,20 @@ import {
   Activity, 
   CheckCircle2,
   TrendingUp,
-  UserCheck
+  UserCheck,
+  ShieldCheck,
+  Flame,
+  Sun
 } from 'lucide-react';
 import { WOMENS_HEALTH_DATA } from '../../data/wellnessData';
 
-export default function WomensHealthView({ activeProfile, onSelectProfile = () => {} }) {
-  const [data, setData] = useState(WOMENS_HEALTH_DATA);
-  const [loggedSymptoms, setLoggedSymptoms] = useState(['Mild Cramps', 'Bloating']);
+export default function WomensHealthView({ activeProfile = {}, onSelectProfile = () => {} }) {
+  const profileId = activeProfile?.id || 'default';
+  const data = WOMENS_HEALTH_DATA[profileId] || WOMENS_HEALTH_DATA['default'];
+  
+  const [loggedSymptoms, setLoggedSymptoms] = useState(() => {
+    return (data?.commonSymptoms || []).slice(0, 2);
+  });
 
   const toggleSymptom = (sym) => {
     setLoggedSymptoms(prev => 
@@ -39,7 +46,7 @@ export default function WomensHealthView({ activeProfile, onSelectProfile = () =
             Women's Health & Hormonal Rhythm
           </h3>
           <p className="text-xs text-slate-600 mt-2.5 leading-relaxed">
-            You are currently viewing the profile of <strong className="text-slate-900">{activeProfile?.name}</strong> ({activeProfile?.gender || 'Male'}).
+            You are currently viewing the profile of <strong className="text-slate-900">{activeProfile?.name || 'User'}</strong> ({activeProfile?.gender || 'Male'}).
             This clinical module (menstrual tracking, ovulation forecasts, and estrogen/progesterone balance) is designed for female biological profiles in your family vault.
           </p>
         </div>
@@ -57,6 +64,9 @@ export default function WomensHealthView({ activeProfile, onSelectProfile = () =
     );
   }
 
+  const isPostMenopausal = activeProfile?.age >= 50;
+  const isPediatric = activeProfile?.age < 18;
+
   return (
     <div className="space-y-6 animate-fadeIn">
       
@@ -72,12 +82,12 @@ export default function WomensHealthView({ activeProfile, onSelectProfile = () =
               <span className="text-xs text-slate-500 font-semibold">{activeProfile.name} ({activeProfile.age}y)</span>
             </div>
             <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 font-display mt-1">
-              Menstrual Cycle & Hormone Tracking
+              {data.stage || 'Hormonal & Biological Wellness'}
             </h2>
           </div>
 
           <span className="badge-green text-xs font-bold">
-            Regular 28-Day Rhythm
+            {isPostMenopausal ? 'Post-Menopause Phase' : isPediatric ? 'Pediatric Stage' : 'Regular 28-Day Rhythm'}
           </span>
         </div>
       </div>
@@ -89,10 +99,10 @@ export default function WomensHealthView({ activeProfile, onSelectProfile = () =
         <div className="card-white p-6 bg-gradient-to-br from-rose-500 to-brand-pink-600 text-white flex flex-col justify-between">
           <div>
             <span className="text-xs uppercase tracking-wider text-rose-100 font-extrabold block">
-              Current Cycle Phase
+              Current Clinical Phase
             </span>
             <h3 className="text-2xl font-extrabold font-display mt-1">
-              {data.currentPhase}
+              {data.currentPhase || 'Hormonal Equilibrium'}
             </h3>
             <p className="text-xs text-rose-100 mt-2 leading-relaxed">
               {data.phaseDescription}
@@ -100,42 +110,70 @@ export default function WomensHealthView({ activeProfile, onSelectProfile = () =
           </div>
 
           <div className="mt-6 pt-4 border-t border-white/20 flex items-center justify-between text-xs text-rose-100">
-            <span>Next Period Due:</span>
+            <span>{isPostMenopausal ? 'Menopause Status:' : 'Next Period Due:'}</span>
             <strong className="text-white text-sm">{data.nextPeriodDate}</strong>
           </div>
         </div>
 
-        {/* Fertile Window & Ovulation */}
+        {/* Fertile Window / Bone & Thyroid Health */}
         <div className="card-white p-6 space-y-4">
           <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-            <Calendar className="w-3.5 h-3.5 text-brand-pink-500" />
-            Ovulation & Fertile Forecast
+            {isPostMenopausal ? (
+              <>
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                Bone Mineral & Thyroid Focus
+              </>
+            ) : (
+              <>
+                <Calendar className="w-3.5 h-3.5 text-brand-pink-500" />
+                Ovulation & Fertile Forecast
+              </>
+            )}
           </h4>
 
-          <div className="p-3.5 bg-rose-50/70 border border-rose-200 rounded-2xl">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-700">Estimated Ovulation</span>
-              <span className="badge-pink text-[10px] font-bold">Day 14</span>
+          {isPostMenopausal ? (
+            <div className="space-y-3">
+              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs">
+                <span className="font-bold text-emerald-900 block mb-0.5">DEXA Bone Screening:</span>
+                <p className="text-emerald-800">
+                  Recommended annual DEXA scan to screen for osteopenia/osteoporosis.
+                </p>
+              </div>
+              <div className="p-3 bg-rose-50 border border-rose-200 rounded-2xl text-xs">
+                <span className="font-bold text-rose-900 block mb-0.5">Thyroid Axis (TSH):</span>
+                <p className="text-rose-800">
+                  TSH 5.85 uIU/mL — maintain strict morning empty-stomach Thyroxine protocol.
+                </p>
+              </div>
             </div>
-            <div className="text-base font-extrabold text-slate-900 mt-1">
-              {data.ovulationDate}
+          ) : (
+            <div className="p-3.5 bg-rose-50/70 border border-rose-200 rounded-2xl">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-700">Estimated Ovulation</span>
+                <span className="badge-pink text-[10px] font-bold">Day 14</span>
+              </div>
+              <div className="text-base font-extrabold text-slate-900 mt-1">
+                {data.ovulationDate || 'Mid-Cycle'}
+              </div>
+              <p className="text-[11px] text-slate-500 mt-1">
+                Fertile Window: {data.fertileWindow}
+              </p>
             </div>
-            <p className="text-[11px] text-slate-500 mt-1">
-              Fertile Window: {data.fertileWindow}
-            </p>
-          </div>
+          )}
 
-          <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs space-y-1">
-            <span className="font-bold text-slate-700 block">Typical Cycle Metrics:</span>
-            <div className="flex justify-between text-slate-500">
-              <span>Average Length:</span>
-              <strong className="text-slate-800">{data.cycleLengthDays} Days</strong>
+          {data.cycleLengthDays > 0 && (
+            <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs space-y-1">
+              <span className="font-bold text-slate-700 block">Typical Cycle Metrics:</span>
+              <div className="flex justify-between text-slate-500">
+                <span>Average Length:</span>
+                <strong className="text-slate-800">{data.cycleLengthDays} Days</strong>
+              </div>
+              <div className="flex justify-between text-slate-500">
+                <span>Period Duration:</span>
+                <strong className="text-slate-800">{data.periodDurationDays} Days</strong>
+              </div>
             </div>
-            <div className="flex justify-between text-slate-500">
-              <span>Period Duration:</span>
-              <strong className="text-slate-800">{data.periodDurationDays} Days</strong>
-            </div>
-          </div>
+          )}
         </div>
 
         {/* Hormonal Nutrition & Energy */}
@@ -149,7 +187,7 @@ export default function WomensHealthView({ activeProfile, onSelectProfile = () =
             <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl">
               <span className="font-bold text-emerald-900 block mb-0.5">Recommended Foods:</span>
               <p className="text-emerald-800 font-medium">
-                {data.recommendedFoods.join(' • ')}
+                {(data.recommendedFoods || []).join(' • ')}
               </p>
             </div>
 
@@ -168,11 +206,11 @@ export default function WomensHealthView({ activeProfile, onSelectProfile = () =
       <div className="card-white p-6 space-y-4">
         <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
           <Activity className="w-3.5 h-3.5 text-brand-pink-500" />
-          Log Daily Hormonal & Premenstrual Symptoms
+          {isPostMenopausal ? 'Log Daily Menopausal & Thyroid Symptoms' : 'Log Daily Hormonal & Premenstrual Symptoms'}
         </h4>
 
         <div className="flex flex-wrap gap-2.5">
-          {data.commonSymptoms.map((sym) => {
+          {(data.commonSymptoms || []).map((sym) => {
             const isLogged = loggedSymptoms.includes(sym);
             return (
               <button
@@ -191,6 +229,39 @@ export default function WomensHealthView({ activeProfile, onSelectProfile = () =
           })}
         </div>
       </div>
+
+      {/* Clinical Hormone Panels (if present) */}
+      {data.hormonePanels && data.hormonePanels.length > 0 && (
+        <div className="card-white p-6 space-y-4">
+          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+            <Sun className="w-3.5 h-3.5 text-amber-500" />
+            Active Clinical Hormone & Biomarker Panels
+          </h4>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {data.hormonePanels.map((panel, idx) => (
+              <div key={idx} className="p-4 bg-slate-50 rounded-2xl border border-slate-200 text-xs space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-900">{panel.name}</span>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                    panel.status.includes('High') || panel.status.includes('Deficiency')
+                      ? 'bg-rose-100 text-rose-800'
+                      : 'bg-emerald-100 text-emerald-800'
+                  }`}>
+                    {panel.status}
+                  </span>
+                </div>
+                <div className="text-base font-extrabold text-slate-800 font-display">
+                  {panel.value}
+                </div>
+                <p className="text-[11px] text-slate-500 leading-snug">
+                  {panel.notes}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
     </div>
   );
