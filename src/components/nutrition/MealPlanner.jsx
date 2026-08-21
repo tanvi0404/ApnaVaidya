@@ -10,37 +10,30 @@ import {
   Info
 } from 'lucide-react';
 import { PROFILE_MEAL_PLANS, RECIPES_DATA } from '../../data/nutritionData';
+import { getDynamicNutritionTargets } from '../../utils/dynamicHealthEngine';
 import { fetchNutritionPlanBackend } from '../../services/apiClient';
 
 export default function MealPlanner({ activeProfile, onSelectRecipe }) {
-  const localPlan = PROFILE_MEAL_PLANS[activeProfile.id] || PROFILE_MEAL_PLANS['user-arjun'];
+  const dynamicTargets = getDynamicNutritionTargets(activeProfile);
+  const basePlan = PROFILE_MEAL_PLANS[activeProfile?.id] || PROFILE_MEAL_PLANS['user-arjun'];
+
+  const localPlan = {
+    ...basePlan,
+    targetCalories: dynamicTargets.targetCalories,
+    goal: `${activeProfile?.dietPreference || 'Vegetarian'} • Calorie & Macro Optimized`,
+    macros: {
+      protein: `${dynamicTargets.proteinGrams}g (${Math.round((dynamicTargets.proteinGrams * 4 / dynamicTargets.targetCalories) * 100)}%)`,
+      carbs: `${dynamicTargets.carbGrams}g (${Math.round((dynamicTargets.carbGrams * 4 / dynamicTargets.targetCalories) * 100)}%)`,
+      fats: `${dynamicTargets.fatGrams}g (${Math.round((dynamicTargets.fatGrams * 9 / dynamicTargets.targetCalories) * 100)}%)`,
+      fiber: `${dynamicTargets.fiberGrams}g (High soluble)`
+    }
+  };
+
   const [plan, setPlan] = React.useState(localPlan);
 
-  // Sync with Java 17 Backend
   React.useEffect(() => {
-    let isMounted = true;
-    fetchNutritionPlanBackend({
-      profileId: activeProfile.id,
-      hba1c: activeProfile.id === 'user-rajesh' ? 7.4 : 5.8,
-      ldl: 146.0
-    }).then(res => {
-      if (isMounted && res) {
-        setPlan(prev => ({
-          ...prev,
-          targetCalories: res.dailyCalories || prev.targetCalories,
-          goal: res.primaryFocus || prev.goal,
-          macros: {
-            protein: `${res.proteinGrams || 95}g (${Math.round((res.proteinGrams * 4 / res.dailyCalories) * 100)}%)`,
-            carbs: `${res.carbGrams || 215}g (${Math.round((res.carbGrams * 4 / res.dailyCalories) * 100)}%)`,
-            fats: `${res.fatGrams || 58}g (${Math.round((res.fatGrams * 9 / res.dailyCalories) * 100)}%)`,
-            fiber: prev.macros.fiber || '35g (High soluble)'
-          }
-        }));
-      }
-    }).catch(err => console.warn('Nutrition client fallback:', err));
-
-    return () => { isMounted = false; };
-  }, [activeProfile.id]);
+    setPlan(localPlan);
+  }, [activeProfile?.id, activeProfile?.weight, activeProfile?.dietPreference]);
 
   return (
     <div className="card-white p-6 space-y-6">

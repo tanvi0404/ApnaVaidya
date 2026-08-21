@@ -10,31 +10,26 @@ import {
   TrendingUp
 } from 'lucide-react';
 import { PROFILE_WORKOUT_ROUTINES, EXERCISES_DATA } from '../../data/exerciseData';
+import { getDynamicExercisePlan } from '../../utils/dynamicHealthEngine';
 import { fetchExerciseRoutineBackend } from '../../services/apiClient';
 
 export default function WorkoutPlanner({ activeProfile, onSelectExercise }) {
-  const localRoutine = PROFILE_WORKOUT_ROUTINES[activeProfile.id] || PROFILE_WORKOUT_ROUTINES['user-arjun'];
+  const dynamicPlan = getDynamicExercisePlan(activeProfile);
+  const baseRoutine = PROFILE_WORKOUT_ROUTINES[activeProfile?.id] || PROFILE_WORKOUT_ROUTINES['user-arjun'];
+
+  const localRoutine = {
+    ...baseRoutine,
+    weeklyCommitment: `${dynamicPlan.weeklyTargetMins} mins / week`,
+    primaryGoal: `Cardio Zone (${dynamicPlan.cardioZone}) • Fat Burn (${dynamicPlan.fatBurnZone})`
+  };
+
   const [routine, setRoutine] = useState(localRoutine);
   const [scheduleState, setScheduleState] = useState(localRoutine.weeklySchedule);
 
-  // Sync with Java 17 Backend
   React.useEffect(() => {
-    let isMounted = true;
-    fetchExerciseRoutineBackend({
-      profileId: activeProfile.id,
-      restingHr: 68
-    }).then(res => {
-      if (isMounted && res) {
-        setRoutine(prev => ({
-          ...prev,
-          weeklyCommitment: `${res.weeklyTargetMinutes || 180} mins / week`,
-          primaryGoal: `Zone-2 Heart Rate (${res.zone2HeartRateRange || '110-128 bpm'})`
-        }));
-      }
-    }).catch(err => console.warn('Exercise client fallback:', err));
-
-    return () => { isMounted = false; };
-  }, [activeProfile.id]);
+    setRoutine(localRoutine);
+    setScheduleState(localRoutine.weeklySchedule);
+  }, [activeProfile?.id, activeProfile?.age]);
 
   const toggleDayCompletion = (idx, e) => {
     e.stopPropagation();

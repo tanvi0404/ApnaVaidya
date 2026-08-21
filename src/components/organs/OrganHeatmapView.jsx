@@ -19,20 +19,34 @@ import {
   ANATOMICAL_ORGAN_SYSTEMS, 
   DRUG_NUTRIENT_DEPLETION_DATABASE 
 } from '../../data/organHeatmapData';
+import { getDynamicOrganVitality } from '../../utils/dynamicHealthEngine';
 import { calculateOrganHeatmapBackend } from '../../services/apiClient';
 
 export default function OrganHeatmapView({ activeProfile }) {
   const [activeTab, setActiveTab] = useState('heatmap'); // 'heatmap' | 'depletion'
   const [selectedOrganId, setSelectedOrganId] = useState('organ-heart');
-  const [organSystems, setOrganSystems] = useState(ANATOMICAL_ORGAN_SYSTEMS);
+  const dynamicVitality = getDynamicOrganVitality(activeProfile);
+
+  const initialSystems = ANATOMICAL_ORGAN_SYSTEMS.map(o => {
+    if (o.id === 'organ-heart') return { ...o, score: dynamicVitality[0]?.score || o.score };
+    if (o.id === 'organ-liver') return { ...o, score: dynamicVitality[1]?.score || o.score };
+    if (o.id === 'organ-kidneys') return { ...o, score: dynamicVitality[2]?.score || o.score };
+    if (o.id === 'organ-lungs') return { ...o, score: dynamicVitality[3]?.score || o.score };
+    if (o.id === 'organ-brain') return { ...o, score: dynamicVitality[4]?.score || o.score };
+    if (o.id === 'organ-pancreas') return { ...o, score: dynamicVitality[5]?.score || o.score };
+    return o;
+  });
+
+  const [organSystems, setOrganSystems] = useState(initialSystems);
 
   // Sync with Java 17 Backend
   React.useEffect(() => {
+    setOrganSystems(initialSystems);
     let isMounted = true;
     calculateOrganHeatmapBackend({
       ldl: 146.0,
-      hba1c: activeProfile.id === 'user-rajesh' ? 7.4 : 5.4,
-      tsh: activeProfile.id === 'user-sunita' ? 5.85 : 2.2,
+      hba1c: activeProfile?.conditions?.some(c => c.includes('Diabetes')) ? 7.4 : 5.4,
+      tsh: activeProfile?.id === 'user-sunita' ? 5.85 : 2.2,
       egfr: 95.0,
       alt: 28.0,
       b12: 215.0,
@@ -53,7 +67,7 @@ export default function OrganHeatmapView({ activeProfile }) {
     }).catch(err => console.warn('Organ heatmap client fallback:', err));
 
     return () => { isMounted = false; };
-  }, [activeProfile.id]);
+  }, [activeProfile?.id, activeProfile?.conditions]);
 
   const selectedOrgan = organSystems.find(o => o.id === selectedOrganId) || organSystems[0];
 

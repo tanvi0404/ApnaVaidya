@@ -4,6 +4,7 @@ import TrendChart from './TrendChart';
 import HydrationTracker from './HydrationTracker';
 import PreventiveCareAlerts from './PreventiveCareAlerts';
 import { TRENDS_DATA } from '../../data/trendsData';
+import { getDynamicBiomarkers } from '../../utils/dynamicHealthEngine';
 import { 
   FileText, 
   UploadCloud, 
@@ -17,9 +18,10 @@ export default function HealthDashboard({
   onOpenUpload = () => {},
   onOpenEmergency = () => {}
 }) {
-  const profileTrends = TRENDS_DATA[activeProfile?.id]?.biomarkers || TRENDS_DATA['user-arjun'].biomarkers;
+  const profileTrends = TRENDS_DATA[activeProfile?.id]?.biomarkers || getDynamicBiomarkers(activeProfile);
   const safeReports = Array.isArray(reports) ? reports : [];
   const recentReports = safeReports.filter(r => r && r.profileId === activeProfile?.id).slice(0, 3);
+  const targetHydration = Number(((parseFloat(activeProfile?.weight) || 68) * 0.035).toFixed(1)) || 2.5;
 
   return (
     <div className="space-y-6 animate-fadeIn">
@@ -39,8 +41,8 @@ export default function HealthDashboard({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Hydration Tracker */}
         <HydrationTracker
-          targetLiters={3.0}
-          currentLiters={2.25}
+          targetLiters={targetHydration}
+          currentLiters={Number((targetHydration * 0.75).toFixed(2))}
         />
 
         {/* Preventive Care Alerts */}

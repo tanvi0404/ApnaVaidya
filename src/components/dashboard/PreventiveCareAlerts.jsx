@@ -1,10 +1,12 @@
 import React from 'react';
 import { AlertCircle, Calendar, ChevronRight, Stethoscope, Sparkles } from 'lucide-react';
 import { PREVENTIVE_CARE_ALERTS } from '../../data/trendsData';
+import { getDynamicPreventiveAlerts } from '../../utils/dynamicHealthEngine';
 
 export default function PreventiveCareAlerts({ activeProfile, onNavigateToDoctors }) {
-  const profileAlerts = PREVENTIVE_CARE_ALERTS.filter(a => a.profileId === activeProfile.id);
-  const displayedAlerts = profileAlerts.length > 0 ? profileAlerts : PREVENTIVE_CARE_ALERTS.slice(0, 2);
+  const profileAlerts = PREVENTIVE_CARE_ALERTS.filter(a => a.profileId === activeProfile?.id);
+  const dynamicAlerts = getDynamicPreventiveAlerts(activeProfile);
+  const displayedAlerts = profileAlerts.length > 0 ? profileAlerts : dynamicAlerts;
 
   return (
     <div className="card-white p-5 space-y-4">
