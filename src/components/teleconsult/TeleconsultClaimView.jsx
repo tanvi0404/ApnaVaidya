@@ -54,7 +54,7 @@ export default function TeleconsultClaimView({ activeProfile }) {
     signPrescriptionBackend({
       doctorName: 'Dr. A. K. Sharma',
       regNumber: 'MCI-48291',
-      patientName: activeProfile.name,
+      patientName: activeProfile?.name || 'Patient',
       diagnosis: 'Mild Dyslipidemia & Vitamin D Deficiency'
     }).then(res => {
       if (res) setSignedRxData(res);
@@ -120,7 +120,7 @@ export default function TeleconsultClaimView({ activeProfile }) {
                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" /> HEALTH WALLET & TELEMEDICINE
               </span>
               <span className="text-xs text-slate-400">•</span>
-              <span className="text-xs text-slate-500 font-semibold">{activeProfile.name}</span>
+              <span className="text-xs text-slate-500 font-semibold">{activeProfile?.name || 'Patient'}</span>
             </div>
             <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 font-display mt-1">
               Smart Insurance Claim Co-Pilot & Virtual Teleconsultation

@@ -482,8 +482,8 @@ export default function ClinicalRiskCalculatorsView({ activeProfile }) {
                     <input
                       type="checkbox"
                       checked={isChecked}
-                      onChange={() => {}}
-                      className="mt-1 w-4 h-4 text-emerald-600 rounded"
+                      readOnly
+                      className="mt-1 w-4 h-4 text-emerald-600 rounded pointer-events-none"
                     />
                     <div>
                       <strong className="text-xs sm:text-sm text-slate-900 block font-bold">{crit.label}</strong>
