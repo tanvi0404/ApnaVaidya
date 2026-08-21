@@ -1,0 +1,8 @@
+Phase 1: Project Setup & White/Green/Pink Shell (Vite + React, custom design tokens, navigation, profile switcher, notification center, emergency SOS modal)
+Phase 2: Medical Report Analysis & OCR Engine (Drag-and-drop report uploader, OCR processing simulator, structured lab parameter table, plain-language AI explanation, shareable token/QR generator)
+Phase 3: Health Dashboard & Longitudinal Trends (Multi-parameter interactive trend graphs, AI trend explanation, category lifestyle metrics, daily vitals & hydration)
+Phase 4: Chikitsak AI Assistant (Multilingual RAG chatbot in English, Hindi, Hinglish, Punjabi; medical citations; AI explainability popover; emergency red-flag triage)
+Phase 5: Personalized Nutrition & Exercise Engine (Goal-tailored meal planner, Indian & global recipes with macro gauges, weekly fitness routines & exercise library with safety notes)
+Phase 6: Medication Tracker & Doctor Visit Summary (Daily dosage schedule 8 AM/1 PM/9 PM, refill alerts, auto-generated doctor consultation summary with printable PDF layout)
+Phase 7: Health Vault, Family Profiles, Symptom Checker & Security (Centralized health vault, multi-profile switcher, hereditary risk tracker, symptom triage, women's health cycle tracker, sleep wellness, and HIPAA/GDPR-style audit trail)
+Phase 8: End-to-End Integration, Build Verification & Polish (Responsive testing, smooth animations, build verification)
