@@ -1,21 +1,49 @@
 /**
  * ApnaVaidya Java 17 Backend Client SDK
- * Connects React UI to Spring Boot REST endpoints on http://localhost:8080/api
+ * Features:
+ * - Dynamic port probing (8080 -> 8081 -> env override)
+ * - LocalStorage state cache for instant offline reload
+ * - Full resilient schema normalizer
  */
 
 import { PRELOADED_REPORTS } from '../data/reportsData';
 import { MEDICATIONS_DATA } from '../data/medicationsData';
 
-const API_BASE_URL = 'http://localhost:8080/api';
+const DEFAULT_PORT_1 = 'http://localhost:8080/api';
+const DEFAULT_PORT_2 = 'http://localhost:8081/api';
+let activeBaseUrl = import.meta.env?.VITE_API_URL || DEFAULT_PORT_1;
+
+// Probe and determine live port
+async function getBaseUrl() {
+  if (activeBaseUrl) {
+    try {
+      const res = await fetch(`${activeBaseUrl}/health`, { method: 'GET', headers: { 'Accept': 'application/json' } });
+      if (res.ok) return activeBaseUrl;
+    } catch (_) {}
+  }
+
+  // Probe fallback port
+  try {
+    const res = await fetch(`${DEFAULT_PORT_2}/health`, { method: 'GET', headers: { 'Accept': 'application/json' } });
+    if (res.ok) {
+      activeBaseUrl = DEFAULT_PORT_2;
+      return activeBaseUrl;
+    }
+  } catch (_) {}
+
+  return activeBaseUrl || DEFAULT_PORT_1;
+}
 
 export async function checkBackendHealth() {
   try {
-    const res = await fetch(`${API_BASE_URL}/health`, {
+    const url = await getBaseUrl();
+    const res = await fetch(`${url}/health`, {
       method: 'GET',
       headers: { 'Accept': 'application/json' }
     });
     if (!res.ok) throw new Error(`HTTP error ${res.status}`);
-    return await res.json();
+    const data = await res.json();
+    return { ...data, resolvedUrl: url };
   } catch (err) {
     console.warn('ApnaVaidya Java backend offline, running in client-mode:', err.message);
     return null;
@@ -23,18 +51,27 @@ export async function checkBackendHealth() {
 }
 
 export async function fetchReportsFromBackend(profileId = null) {
+  // Check LocalStorage cache first
+  const cacheKey = profileId ? `apnavaidya_reports_${profileId}` : 'apnavaidya_reports_all';
+  let cachedReports = null;
   try {
-    const url = profileId ? `${API_BASE_URL}/reports?profileId=${profileId}` : `${API_BASE_URL}/reports`;
+    const saved = localStorage.getItem(cacheKey);
+    if (saved) cachedReports = JSON.parse(saved);
+  } catch (_) {}
+
+  try {
+    const urlBase = await getBaseUrl();
+    const url = profileId ? `${urlBase}/reports?profileId=${profileId}` : `${urlBase}/reports`;
     const res = await fetch(url);
     if (!res.ok) throw new Error(`HTTP error ${res.status}`);
     const rawReports = await res.json();
 
     if (!Array.isArray(rawReports) || rawReports.length === 0) {
-      return PRELOADED_REPORTS;
+      return cachedReports || PRELOADED_REPORTS;
     }
 
     // Normalize reports to guarantee full UI schema compatibility
-    return rawReports.map((r) => {
+    const normalized = rawReports.map((r) => {
       const matchingPreload = PRELOADED_REPORTS.find(p => p.id === r.id);
 
       const params = (r.parameters || matchingPreload?.parameters || []).map(p => ({
@@ -83,15 +120,23 @@ export async function fetchReportsFromBackend(profileId = null) {
         parameters: params
       };
     });
+
+    // Save to LocalStorage
+    try {
+      localStorage.setItem(cacheKey, JSON.stringify(normalized));
+    } catch (_) {}
+
+    return normalized;
   } catch (err) {
-    console.warn('Fallback to local preloaded reports:', err.message);
-    return PRELOADED_REPORTS;
+    console.warn('Fallback to cached/preloaded reports:', err.message);
+    return cachedReports || PRELOADED_REPORTS;
   }
 }
 
 export async function askChikitsakBackend({ userMessage, language, profileName, profileAge, profileGender, reportContext }) {
   try {
-    const res = await fetch(`${API_BASE_URL}/chat/ask`, {
+    const urlBase = await getBaseUrl();
+    const res = await fetch(`${urlBase}/chat/ask`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -113,7 +158,8 @@ export async function askChikitsakBackend({ userMessage, language, profileName, 
 
 export async function calculateAscvdBackend(ascvdParams) {
   try {
-    const res = await fetch(`${API_BASE_URL}/risk/ascvd`, {
+    const urlBase = await getBaseUrl();
+    const res = await fetch(`${urlBase}/risk/ascvd`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(ascvdParams)
@@ -128,7 +174,8 @@ export async function calculateAscvdBackend(ascvdParams) {
 
 export async function calculateIdrsBackend(idrsParams) {
   try {
-    const res = await fetch(`${API_BASE_URL}/risk/idrs`, {
+    const urlBase = await getBaseUrl();
+    const res = await fetch(`${urlBase}/risk/idrs`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(idrsParams)
@@ -143,7 +190,8 @@ export async function calculateIdrsBackend(idrsParams) {
 
 export async function calculateVascularBackend(vascularParams) {
   try {
-    const res = await fetch(`${API_BASE_URL}/vascular/age`, {
+    const urlBase = await getBaseUrl();
+    const res = await fetch(`${urlBase}/vascular/age`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(vascularParams)
@@ -157,19 +205,30 @@ export async function calculateVascularBackend(vascularParams) {
 }
 
 export async function fetchMedicationsFromBackend(profileId = 'user-arjun') {
+  const cacheKey = `apnavaidya_meds_${profileId}`;
+  let cached = null;
   try {
-    const res = await fetch(`${API_BASE_URL}/medications?profileId=${profileId}`);
+    const saved = localStorage.getItem(cacheKey);
+    if (saved) cached = JSON.parse(saved);
+  } catch (_) {}
+
+  try {
+    const urlBase = await getBaseUrl();
+    const res = await fetch(`${urlBase}/medications?profileId=${profileId}`);
     if (!res.ok) throw new Error(`HTTP error ${res.status}`);
-    return await res.json();
+    const data = await res.json();
+    try { localStorage.setItem(cacheKey, JSON.stringify(data)); } catch (_) {}
+    return data;
   } catch (err) {
     console.warn('Medications backend fallback:', err.message);
-    return MEDICATIONS_DATA[profileId] || MEDICATIONS_DATA['user-arjun'];
+    return cached || MEDICATIONS_DATA[profileId] || MEDICATIONS_DATA['user-arjun'];
   }
 }
 
 export async function toggleMedicationBackend(medId) {
   try {
-    const res = await fetch(`${API_BASE_URL}/medications`, {
+    const urlBase = await getBaseUrl();
+    const res = await fetch(`${urlBase}/medications`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ medId })
@@ -184,7 +243,8 @@ export async function toggleMedicationBackend(medId) {
 
 export async function checkDrugInteractionsBackend(drugs) {
   try {
-    const res = await fetch(`${API_BASE_URL}/medications/interaction`, {
+    const urlBase = await getBaseUrl();
+    const res = await fetch(`${urlBase}/medications/interaction`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ drugs })
@@ -199,7 +259,8 @@ export async function checkDrugInteractionsBackend(drugs) {
 
 export async function calculateLongevityBackend(longevityParams) {
   try {
-    const res = await fetch(`${API_BASE_URL}/longevity/score`, {
+    const urlBase = await getBaseUrl();
+    const res = await fetch(`${urlBase}/longevity/score`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(longevityParams)
@@ -214,7 +275,8 @@ export async function calculateLongevityBackend(longevityParams) {
 
 export async function fetchAuditLogsFromBackend() {
   try {
-    const res = await fetch(`${API_BASE_URL}/security/audit-logs`);
+    const urlBase = await getBaseUrl();
+    const res = await fetch(`${urlBase}/security/audit-logs`);
     if (!res.ok) throw new Error(`HTTP error ${res.status}`);
     return await res.json();
   } catch (err) {
@@ -225,7 +287,8 @@ export async function fetchAuditLogsFromBackend() {
 
 export async function logAuditEventBackend(eventType, details) {
   try {
-    const res = await fetch(`${API_BASE_URL}/security/audit-logs`, {
+    const urlBase = await getBaseUrl();
+    const res = await fetch(`${urlBase}/security/audit-logs`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ eventType, details })
@@ -240,7 +303,8 @@ export async function logAuditEventBackend(eventType, details) {
 
 export async function signPrescriptionBackend(rxParams) {
   try {
-    const res = await fetch(`${API_BASE_URL}/teleconsult/sign-prescription`, {
+    const urlBase = await getBaseUrl();
+    const res = await fetch(`${urlBase}/teleconsult/sign-prescription`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(rxParams)
@@ -255,7 +319,8 @@ export async function signPrescriptionBackend(rxParams) {
 
 export async function calculatePrakritiBackend(prakritiParams) {
   try {
-    const res = await fetch(`${API_BASE_URL}/ayurveda/prakriti`, {
+    const urlBase = await getBaseUrl();
+    const res = await fetch(`${urlBase}/ayurveda/prakriti`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(prakritiParams)
@@ -270,7 +335,8 @@ export async function calculatePrakritiBackend(prakritiParams) {
 
 export async function calculateOrganHeatmapBackend(organParams) {
   try {
-    const res = await fetch(`${API_BASE_URL}/organs/heatmap`, {
+    const urlBase = await getBaseUrl();
+    const res = await fetch(`${urlBase}/organs/heatmap`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(organParams)
@@ -285,7 +351,8 @@ export async function calculateOrganHeatmapBackend(organParams) {
 
 export async function triageSymptomsBackend(symptoms, durationDays = 2) {
   try {
-    const res = await fetch(`${API_BASE_URL}/symptoms/triage`, {
+    const urlBase = await getBaseUrl();
+    const res = await fetch(`${urlBase}/symptoms/triage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ symptoms, durationDays })
@@ -300,7 +367,8 @@ export async function triageSymptomsBackend(symptoms, durationDays = 2) {
 
 export async function fetchWearablesSyncBackend(profileId = 'user-arjun') {
   try {
-    const res = await fetch(`${API_BASE_URL}/wearables/sync?profileId=${profileId}`);
+    const urlBase = await getBaseUrl();
+    const res = await fetch(`${urlBase}/wearables/sync?profileId=${profileId}`);
     if (!res.ok) throw new Error(`HTTP error ${res.status}`);
     return await res.json();
   } catch (err) {
@@ -311,7 +379,8 @@ export async function fetchWearablesSyncBackend(profileId = 'user-arjun') {
 
 export async function simulateWhatIfBackend(simParams) {
   try {
-    const res = await fetch(`${API_BASE_URL}/simulation/what-if`, {
+    const urlBase = await getBaseUrl();
+    const res = await fetch(`${urlBase}/simulation/what-if`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(simParams)
@@ -326,7 +395,8 @@ export async function simulateWhatIfBackend(simParams) {
 
 export async function fetchMicrobiomeProfileBackend(profileId = 'user-arjun') {
   try {
-    const res = await fetch(`${API_BASE_URL}/microbiome/profile?profileId=${profileId}`);
+    const urlBase = await getBaseUrl();
+    const res = await fetch(`${urlBase}/microbiome/profile?profileId=${profileId}`);
     if (!res.ok) throw new Error(`HTTP error ${res.status}`);
     return await res.json();
   } catch (err) {
@@ -337,7 +407,8 @@ export async function fetchMicrobiomeProfileBackend(profileId = 'user-arjun') {
 
 export async function fetchExposomeCityBackend(city = 'Delhi NCR') {
   try {
-    const res = await fetch(`${API_BASE_URL}/exposome/city`, {
+    const urlBase = await getBaseUrl();
+    const res = await fetch(`${urlBase}/exposome/city`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ city })
@@ -352,7 +423,8 @@ export async function fetchExposomeCityBackend(city = 'Delhi NCR') {
 
 export async function fetchNutritionPlanBackend({ profileId = 'user-arjun', hba1c = 5.8, ldl = 146.0 }) {
   try {
-    const res = await fetch(`${API_BASE_URL}/nutrition/plan`, {
+    const urlBase = await getBaseUrl();
+    const res = await fetch(`${urlBase}/nutrition/plan`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ profileId, hba1c, ldl })
@@ -367,7 +439,8 @@ export async function fetchNutritionPlanBackend({ profileId = 'user-arjun', hba1
 
 export async function fetchExerciseRoutineBackend({ profileId = 'user-arjun', restingHr = 68 }) {
   try {
-    const res = await fetch(`${API_BASE_URL}/exercise/routine`, {
+    const urlBase = await getBaseUrl();
+    const res = await fetch(`${urlBase}/exercise/routine`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ profileId, restingHr })
@@ -382,7 +455,8 @@ export async function fetchExerciseRoutineBackend({ profileId = 'user-arjun', re
 
 export async function matchGenomicsBackend({ drug = 'Clopidogrel', gene = 'CYP2C19' }) {
   try {
-    const res = await fetch(`${API_BASE_URL}/genomics/match`, {
+    const urlBase = await getBaseUrl();
+    const res = await fetch(`${urlBase}/genomics/match`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ drug, gene })

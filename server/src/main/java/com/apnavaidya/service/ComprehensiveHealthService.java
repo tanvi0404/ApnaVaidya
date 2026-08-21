@@ -1,14 +1,27 @@
 package com.apnavaidya.service;
 
+import com.apnavaidya.storage.DatabaseManager;
+
 import java.security.MessageDigest;
 import java.util.*;
 
 public class ComprehensiveHealthService {
 
     private final List<Map<String, Object>> auditLogs = new ArrayList<>();
+    private final DatabaseManager db = DatabaseManager.getInstance();
 
     public ComprehensiveHealthService() {
-        initInitialLogs();
+        loadOrInitLogs();
+    }
+
+    private void loadOrInitLogs() {
+        String json = db.loadTableData("audit_logs");
+        if (json != null && !json.trim().isEmpty() && !json.trim().equals("[]")) {
+            parseLogsJson(json);
+        } else {
+            initInitialLogs();
+            saveLogs();
+        }
     }
 
     private void initInitialLogs() {
@@ -43,11 +56,70 @@ public class ComprehensiveHealthService {
         }
 
         auditLogs.add(0, log);
+        saveLogs();
         return log;
     }
 
     public synchronized List<Map<String, Object>> getAuditLogs() {
         return new ArrayList<>(auditLogs);
+    }
+
+    private synchronized void saveLogs() {
+        StringBuilder sb = new StringBuilder("[");
+        for (int i = 0; i < auditLogs.size(); i++) {
+            Map<String, Object> log = auditLogs.get(i);
+            sb.append("{")
+              .append("\"id\":\"").append(log.get("id")).append("\",")
+              .append("\"eventType\":\"").append(log.get("eventType")).append("\",")
+              .append("\"details\":\"").append(escapeJson((String) log.get("details"))).append("\",")
+              .append("\"status\":\"").append(log.get("status")).append("\",")
+              .append("\"ipAddress\":\"").append(log.get("ipAddress")).append("\",")
+              .append("\"timestamp\":\"").append(log.get("timestamp")).append("\",")
+              .append("\"blockHash\":\"").append(log.get("blockHash")).append("\"")
+              .append("}");
+            if (i < auditLogs.size() - 1) sb.append(",");
+        }
+        sb.append("]");
+        db.saveTableData("audit_logs", sb.toString());
+    }
+
+    private void parseLogsJson(String json) {
+        try {
+            String[] items = json.split("\\{\"id\":");
+            for (int i = 1; i < items.length; i++) {
+                String b = items[i];
+                Map<String, Object> log = new HashMap<>();
+                log.put("id", extractField(b, "\"id\":\"", "\""));
+                log.put("eventType", extractField(b, "\"eventType\":\"", "\""));
+                log.put("details", extractField(b, "\"details\":\"", "\""));
+                log.put("status", extractField(b, "\"status\":\"", "\""));
+                log.put("ipAddress", extractField(b, "\"ipAddress\":\"", "\""));
+                log.put("timestamp", extractField(b, "\"timestamp\":\"", "\""));
+                log.put("blockHash", extractField(b, "\"blockHash\":\"", "\""));
+                auditLogs.add(log);
+            }
+        } catch (Exception e) {
+            initInitialLogs();
+        }
+    }
+
+    private String extractField(String block, String prefix, String suffix) {
+        int start = block.indexOf(prefix);
+        if (start == -1) {
+            int alt = block.indexOf(prefix.substring(prefix.indexOf(":") + 1));
+            if (alt == -1) return "";
+            start = alt;
+        } else {
+            start += prefix.length();
+        }
+        int end = block.indexOf(suffix, start);
+        if (end == -1) return "";
+        return block.substring(start, end).replace("\\\"", "\"");
+    }
+
+    private String escapeJson(String s) {
+        if (s == null) return "";
+        return s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
     }
 
     // 2. IDRS Diabetes Risk Score

@@ -43,6 +43,9 @@ public class MedicalReport {
     public String getDate() { return date; }
     public void setDate(String date) { this.date = date; }
 
+    public String getTestDate() { return date; }
+    public void setTestDate(String testDate) { this.date = testDate; }
+
     public String getCategory() { return category; }
     public void setCategory(String category) { this.category = category; }
 

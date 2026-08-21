@@ -1,15 +1,27 @@
 package com.apnavaidya.service;
 
 import com.apnavaidya.model.MedicationItem;
+import com.apnavaidya.storage.DatabaseManager;
 
 import java.util.*;
 
 public class MedicationService {
 
     private final List<MedicationItem> medications = new ArrayList<>();
+    private final DatabaseManager db = DatabaseManager.getInstance();
 
     public MedicationService() {
-        initMedications();
+        loadOrInitMedications();
+    }
+
+    private void loadOrInitMedications() {
+        String json = db.loadTableData("medications");
+        if (json != null && !json.trim().isEmpty() && !json.trim().equals("[]")) {
+            parseMedicationsJson(json);
+        } else {
+            initMedications();
+            saveMedications();
+        }
     }
 
     private void initMedications() {
@@ -56,7 +68,7 @@ public class MedicationService {
         ));
     }
 
-    public List<MedicationItem> getMedicationsByProfile(String profileId) {
+    public synchronized List<MedicationItem> getMedicationsByProfile(String profileId) {
         List<MedicationItem> result = new ArrayList<>();
         for (MedicationItem m : medications) {
             if (profileId == null || profileId.equalsIgnoreCase(m.getProfileId())) {
@@ -66,7 +78,7 @@ public class MedicationService {
         return result.isEmpty() ? medications : result;
     }
 
-    public boolean toggleMedicationStatus(String medId) {
+    public synchronized boolean toggleMedicationStatus(String medId) {
         for (MedicationItem m : medications) {
             if (m.getId().equalsIgnoreCase(medId)) {
                 m.setTakenToday(!m.isTakenToday());
@@ -75,6 +87,7 @@ public class MedicationService {
                 } else if (!m.isTakenToday()) {
                     m.setRemainingPills(m.getRemainingPills() + 1);
                 }
+                saveMedications();
                 return true;
             }
         }
@@ -96,5 +109,89 @@ public class MedicationService {
         }
 
         return warnings;
+    }
+
+    private synchronized void saveMedications() {
+        StringBuilder sb = new StringBuilder("[");
+        for (int i = 0; i < medications.size(); i++) {
+            MedicationItem m = medications.get(i);
+            sb.append("{")
+              .append("\"id\":\"").append(escapeJson(m.getId())).append("\",")
+              .append("\"profileId\":\"").append(escapeJson(m.getProfileId())).append("\",")
+              .append("\"name\":\"").append(escapeJson(m.getName())).append("\",")
+              .append("\"genericName\":\"").append(escapeJson(m.getGenericName())).append("\",")
+              .append("\"dosage\":\"").append(escapeJson(m.getDosage())).append("\",")
+              .append("\"frequency\":\"").append(escapeJson(m.getFrequency())).append("\",")
+              .append("\"timing\":\"").append(escapeJson(m.getTiming())).append("\",")
+              .append("\"foodInstruction\":\"").append(escapeJson(m.getFoodInstruction())).append("\",")
+              .append("\"prescribedFor\":\"").append(escapeJson(m.getPrescribedFor())).append("\",")
+              .append("\"doctorName\":\"").append(escapeJson(m.getDoctorName())).append("\",")
+              .append("\"remainingDays\":").append(m.getRemainingDays()).append(",")
+              .append("\"totalPills\":").append(m.getTotalPills()).append(",")
+              .append("\"remainingPills\":").append(m.getRemainingPills()).append(",")
+              .append("\"takenToday\":").append(m.isTakenToday())
+              .append("}");
+            if (i < medications.size() - 1) sb.append(",");
+        }
+        sb.append("]");
+        db.saveTableData("medications", sb.toString());
+    }
+
+    private void parseMedicationsJson(String json) {
+        try {
+            String[] items = json.split("\\{\"id\":");
+            for (int i = 1; i < items.length; i++) {
+                String b = items[i];
+                String id = extractField(b, "\"id\":\"", "\"");
+                String prof = extractField(b, "\"profileId\":\"", "\"");
+                String name = extractField(b, "\"name\":\"", "\"");
+                String gen = extractField(b, "\"genericName\":\"", "\"");
+                String dos = extractField(b, "\"dosage\":\"", "\"");
+                String freq = extractField(b, "\"frequency\":\"", "\"");
+                String tim = extractField(b, "\"timing\":\"", "\"");
+                String food = extractField(b, "\"foodInstruction\":\"", "\"");
+                String purp = extractField(b, "\"prescribedFor\":\"", "\"");
+                String doc = extractField(b, "\"doctorName\":\"", "\"");
+                int remDays = extractInt(b, "\"remainingDays\":");
+                int totPills = extractInt(b, "\"totalPills\":");
+                int remPills = extractInt(b, "\"remainingPills\":");
+                boolean taken = b.contains("\"takenToday\":true");
+                medications.add(new MedicationItem(id, prof, name, gen, dos, freq, tim, food, purp, doc, remDays, totPills, remPills, taken));
+            }
+        } catch (Exception e) {
+            initMedications();
+        }
+    }
+
+    private String extractField(String block, String prefix, String suffix) {
+        int start = block.indexOf(prefix);
+        if (start == -1) {
+            int alt = block.indexOf(prefix.substring(prefix.indexOf(":") + 1));
+            if (alt == -1) return "";
+            start = alt;
+        } else {
+            start += prefix.length();
+        }
+        int end = block.indexOf(suffix, start);
+        if (end == -1) return "";
+        return block.substring(start, end).replace("\\\"", "\"");
+    }
+
+    private int extractInt(String block, String prefix) {
+        try {
+            int start = block.indexOf(prefix);
+            if (start == -1) return 0;
+            start += prefix.length();
+            int end = block.indexOf(",", start);
+            if (end == -1) end = block.indexOf("}", start);
+            return Integer.parseInt(block.substring(start, end).trim());
+        } catch (Exception e) {
+            return 0;
+        }
+    }
+
+    private String escapeJson(String s) {
+        if (s == null) return "";
+        return s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
     }
 }

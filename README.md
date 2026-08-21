@@ -1,64 +1,77 @@
 # 🌿 ApnaVaidya (अपना वैद्य) — AI Healthcare Platform
 
-> **Your Health, Understood.**
-> An AI-powered personal healthcare platform with an ultra-clean **White + Emerald Green + Caring Rose Pink** clinical design system and a **Java 17 REST API Backend** running on port `8080`.
+> **Your Health, Understood.**  
+> An AI-powered personal healthcare platform featuring a **White + Emerald Green + Caring Rose Pink** clinical design system, dynamic code-splitting, and a **Java 17 REST API Backend** running on port `8080` with atomic file-backed persistent storage.
 
 ---
 
-## 🌟 Key Platform Features
+## 🌟 Key Platform Features & Data Architecture
 
-- **🧪 Medical Report Analysis & Neural OCR**: 5-stage diagnostic report extraction with side-by-side longitudinal parameter compare and speech synthesis.
-- **🤖 Chikitsak AI Clinical Assistant**: Multilingual RAG assistant supporting English, Hindi, Hinglish, and Punjabi with citations and explainability.
-- **📊 What-If Lifestyle & Metabolic Scenario Simulator**: Interactive sliders for walking, soluble fiber, sleep, and weight loss with real-time mathematical regression and a 3-year SVG trajectory curve.
-- **🫀 Multi-Organ System Vitality Heatmap**: 7-organ interactive SVG anatomical map and prescription drug-nutrient depletion matrix (*Metformin ➔ B12, Statins ➔ CoQ10, PPIs ➔ Mg/Iron*).
-- **🌿 Ayurvedic Prakriti & Herb-Drug Safety**: 5-pillar constitutional tri-dosha diagnostic (*Vata, Pitta, Kapha*), botanical-allopathic compatibility matrix, and Agni digestive tea therapeutics.
-- **🦠 Gut Microbiome & Chrono-Nutrition**: Gut flora diversity metrics (79/100), SCFA gauges (Butyrate, Acetate, Propionate), Indian prebiotic fermented foods, and 13-hour circadian fasting timer.
-- **🍃 AQI & Heat Exposome Shield**: Real-time city AQI tracker (Delhi, Mumbai, Bengaluru), particulate vulnerability index, and Wet-Bulb heat index calculator.
-- **🛡️ Smart Health Insurance & Teleconsultation**: 6-point hospitalization claim scanner, cashless pre-auth radar, and virtual teleconsultation room with SHA-256 signed E-Prescriptions.
-- **🧬 Pharmacogenomics (PGx) & Epigenetics**: Precision drug-gene compatibility matcher (`CYP2C19`, `SLCO1B1`, `CYP2D6`, `MTHFR`) with CPIC Level clinical guidelines.
-- **🫀 Vascular Age & 180-Min Glucose Curves**: ePWV arterial stiffness calculator and post-meal GLUT-4 walking curve simulator.
-- **💊 Medications & Pharmacovigilance**: Prescription schedules, inventory alerts, and drug-drug/drug-food interaction safety checks.
-- **🚨 Emergency First-Aid Wizard**: 110 BPM adult CPR metronome, Stroke BE FAST, Choking Heimlich, and 24x7 ER hospital list.
-- **📄 Printable Clinical Dossier & Encrypted Vault**: Multi-page certified clinical dossier and HIPAA/GDPR immutable audit log stream.
+| Feature / Module | Backend Status | Architecture Details |
+| :--- | :---: | :--- |
+| **🧪 Medical Report Analysis & Neural OCR** | **Live & Persisted** | 5-stage diagnostic report extraction, persistent JSON table storage (`server/data/reports.json`), side-by-side longitudinal compare & Web Speech synthesis. |
+| **💊 Medications & Pharmacovigilance** | **Live & Persisted** | Real-time adherence logging, pill inventory decrements saved to disk (`server/data/medications.json`), and drug-drug/drug-food interaction rules. |
+| **🔒 HIPAA & GDPR Security Audit Vault** | **Live & Persisted** | SHA-256 block-hashed audit trail persisted to disk (`server/data/audit_logs.json`) tracking consent and patient record access. |
+| **📊 What-If Lifestyle Scenario Simulator** | **Live REST Calculation** | Multivariate linear regression algorithms computing 36-month projected drops in HbA1c, LDL-C, SBP, and weight with 3-year SVG curves. |
+| **🤖 Chikitsak AI Clinical Assistant** | **Live REST Calculation** | Multilingual clinical RAG engine (English, Hindi, Hinglish, Punjabi) with medical citation grounding and emergency red-flag triage. |
+| **🫀 ASCVD & IDRS Risk Engines** | **Live REST Calculation** | 10-Year ASCVD Cardiovascular Risk & ICMR-INDIAB Indian Diabetes Risk Score calculations. |
+| **🛡️ E-Prescriptions & Teleconsult** | **Live REST Calculation** | NMC-compliant cryptographic SHA-256 digital signature generator for e-prescriptions. |
+| **🌿 Ayurvedic Prakriti & Herb Safety** | **Live REST Calculation** | Tri-Dosha Prakriti constitutional calculation engine and herb-drug safety matrix. |
+| **🦠 Gut Microbiome & Chrono-Nutrition** | **Live REST Calculation** | Gut flora diversity score (79/100), SCFA gauges (Butyrate/Acetate/Propionate), and circadian fasting timer. |
+| **🍃 AQI & Heat Exposome Shield** | **Live REST Calculation** | Indian city AQI and pollutant vulnerability index (Delhi, Mumbai, Bengaluru). |
+| **🧬 Pharmacogenomics (PGx) Matcher** | **Live REST Calculation** | Precision CPIC Level drug-gene interaction guidelines (`CYP2C19`, `SLCO1B1`, `CYP2D6`, `MTHFR`). |
+| **📄 Certified Health Dossier & Vault** | **Client & LocalStorage** | Multi-page printable clinical dossier and encrypted backup/restore. |
 
 ---
 
-## 🏗️ Architecture & Technology Stack
+## 🏗️ Technology Stack
 
-- **Frontend**: React 18, Vite 5, Tailwind CSS, Lucide Icons, Web Speech API.
+- **Frontend**: React 18, Vite 5 (Dynamic Code-Splitting with `React.lazy`), Tailwind CSS, Lucide Icons, Web Speech API.
 - **Backend**: Java 17 (OpenJDK), Multi-threaded `com.sun.net.httpserver.HttpServer` REST API Engine.
-- **Color Palette**: Clinical White (`#FFFFFF`, `#FAFCFA`), Emerald Green (`#059669`, `#10B981`), Caring Rose Pink (`#F43F5E`, `#FFF1F2`).
+- **Storage Layer**: `DatabaseManager` providing atomic persistent JSON storage in `server/data/`.
+- **Client SDK**: `apiClient.js` with dynamic port discovery (probes 8080 ➔ 8081 ➔ `VITE_API_URL`) and LocalStorage offline caching.
 
 ---
 
 ## 🚀 Quickstart & Setup Guide
 
-### 1. Prerequisites
-- **Node.js**: `v18.0.0` or higher
-- **Java**: `OpenJDK 17` or higher (`java -version`)
-- **Git**: Installed and configured
-
-### 2. Clone the Repository
+### 1. Clone the Repository
 ```bash
-git clone https://github.com/<your-username>/apna-vaidya.git
-cd apna-vaidya
+git clone https://github.com/tanvi0404/ApnaVaidya.git
+cd ApnaVaidya
 ```
 
-### 3. Install Frontend Dependencies
+### 2. Install Frontend Dependencies
 ```bash
 npm install
 ```
 
-### 4. Compile & Run the Java 17 Backend
-```bash
-# Compile Java backend classes
-javac --release 17 -d server/target/classes server/src/main/java/com/apnavaidya/model/*.java server/src/main/java/com/apnavaidya/service/*.java server/src/main/java/com/apnavaidya/ApnaVaidyaServer.java
+### 3. Build & Run the Java 17 Backend
+You can run the backend using either standard `javac` or Maven:
 
-# Launch the Java REST API server (Port 8080)
+#### Option A: Direct Java 17 Compilation (Zero external dependencies)
+```bash
+# Compile backend classes
+javac --release 17 -d server/target/classes server/src/main/java/com/apnavaidya/model/*.java server/src/main/java/com/apnavaidya/storage/*.java server/src/main/java/com/apnavaidya/service/*.java server/src/main/java/com/apnavaidya/ApnaVaidyaServer.java
+
+# Start the server (Port 8080)
 java -cp "server/target/classes" com.apnavaidya.ApnaVaidyaServer
 ```
 
-### 5. Launch the React Frontend Dev Server
+#### Option B: Maven
+```bash
+cd server
+mvn compile exec:java
+```
+
+### 4. Run the Automated Test Suite
+```bash
+# Compile and run backend clinical tests
+javac --release 17 -d server/target/classes server/src/main/java/com/apnavaidya/model/*.java server/src/main/java/com/apnavaidya/storage/*.java server/src/main/java/com/apnavaidya/service/*.java server/src/main/java/com/apnavaidya/ApnaVaidyaServer.java server/src/test/java/com/apnavaidya/ApnaVaidyaTest.java
+java -cp "server/target/classes" com.apnavaidya.ApnaVaidyaTest
+```
+
+### 5. Launch the React Frontend
 ```bash
 npm run dev
 ```
@@ -67,18 +80,18 @@ Open **`http://localhost:5173/`** in your browser.
 
 ---
 
-## 🔌 Java REST API Endpoints Overview
+## 🔌 Java REST API Endpoints
 
-| Endpoint | Method | Purpose |
+| Endpoint | Method | Functionality |
 | :--- | :---: | :--- |
-| `/api/health` | `GET` | Health check & system uptime |
-| `/api/reports` | `GET` / `POST` | Lab reports & neural OCR data |
+| `/api/health` | `GET` | Health check & system uptime probe |
+| `/api/reports` | `GET` / `POST` | Lab reports & neural OCR data (Disk Persisted) |
 | `/api/simulation/what-if` | `POST` | What-If metabolic projections & 3-yr trajectory |
 | `/api/chat/ask` | `POST` | Chikitsak AI multilingual RAG engine |
 | `/api/risk/ascvd` | `POST` | 10-Year ASCVD Cardiovascular Risk |
 | `/api/risk/idrs` | `POST` | Indian Diabetes Risk Score (IDRS) |
 | `/api/vascular/age` | `POST` | Arterial vascular age & ePWV |
-| `/api/medications` | `GET` / `POST` | Prescription schedule & pill logging |
+| `/api/medications` | `GET` / `POST` | Prescription schedule & pill logging (Disk Persisted) |
 | `/api/medications/interaction` | `POST` | Drug-drug & drug-food interactions |
 | `/api/longevity/score` | `POST` | Composite Longevity & Biological Age |
 | `/api/ayurveda/prakriti` | `POST` | Tri-Dosha Prakriti constitutional engine |
@@ -91,9 +104,9 @@ Open **`http://localhost:5173/`** in your browser.
 | `/api/symptoms/triage` | `POST` | Clinical red-flag triage |
 | `/api/wearables/sync` | `GET` | Wearables biometrics sync |
 | `/api/teleconsult/sign-prescription` | `POST` | SHA-256 digital signature generator |
-| `/api/security/audit-logs` | `GET` / `POST` | Immutable HIPAA/GDPR audit log stream |
+| `/api/security/audit-logs` | `GET` / `POST` | Immutable HIPAA/GDPR audit log stream (Disk Persisted) |
 
 ---
 
 ## 📄 License
-MIT License. Created for AI-driven clinical empowerment and preventive health.
+MIT License. Created for clinical empowerment and preventive health.
