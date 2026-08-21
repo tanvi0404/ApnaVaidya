@@ -102,18 +102,20 @@ export default function ClinicalRiskCalculatorsView({ activeProfile }) {
       familyHistory: idrsFamilyHistory
     }).then(res => {
       if (isMounted && res) {
-        const serverScore = res.score ?? res.idrsScore ?? res.totalScore ?? prev.score;
-        setIdrsResult(prev => ({
-          ...prev,
-          score: serverScore,
-          totalScore: serverScore,
-          maxScore: 100,
-          riskCategory: res.riskCategory || prev.riskCategory || 'HIGH',
-          category: res.riskCategory || prev.category,
-          label: res.riskCategory || prev.label,
-          advice: res.clinicalAdvice || prev.advice,
-          recommendation: res.clinicalAdvice || prev.recommendation
-        }));
+        setIdrsResult(prev => {
+          const serverScore = res.score ?? res.idrsScore ?? res.totalScore ?? prev.score ?? 50;
+          return {
+            ...prev,
+            score: serverScore,
+            totalScore: serverScore,
+            maxScore: 100,
+            riskCategory: res.riskCategory || prev.riskCategory || 'HIGH',
+            category: res.riskCategory || prev.category,
+            label: res.riskCategory || prev.label,
+            advice: res.clinicalAdvice || prev.advice,
+            recommendation: res.clinicalAdvice || prev.recommendation
+          };
+        });
       }
     }).catch(() => {
       if (isMounted) setIdrsResult(localIdrs);

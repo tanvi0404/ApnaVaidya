@@ -1,6 +1,7 @@
 package com.apnavaidya.service;
 
 import com.apnavaidya.storage.DatabaseManager;
+import com.apnavaidya.storage.JsonUtil;
 
 import java.security.MessageDigest;
 import java.util.*;
@@ -69,13 +70,13 @@ public class ComprehensiveHealthService {
         for (int i = 0; i < auditLogs.size(); i++) {
             Map<String, Object> log = auditLogs.get(i);
             sb.append("{")
-              .append("\"id\":\"").append(log.get("id")).append("\",")
-              .append("\"eventType\":\"").append(log.get("eventType")).append("\",")
-              .append("\"details\":\"").append(escapeJson((String) log.get("details"))).append("\",")
-              .append("\"status\":\"").append(log.get("status")).append("\",")
-              .append("\"ipAddress\":\"").append(log.get("ipAddress")).append("\",")
-              .append("\"timestamp\":\"").append(log.get("timestamp")).append("\",")
-              .append("\"blockHash\":\"").append(log.get("blockHash")).append("\"")
+              .append("\"id\":\"").append(JsonUtil.escapeJson((String) log.get("id"))).append("\",")
+              .append("\"eventType\":\"").append(JsonUtil.escapeJson((String) log.get("eventType"))).append("\",")
+              .append("\"details\":\"").append(JsonUtil.escapeJson((String) log.get("details"))).append("\",")
+              .append("\"status\":\"").append(JsonUtil.escapeJson((String) log.get("status"))).append("\",")
+              .append("\"ipAddress\":\"").append(JsonUtil.escapeJson((String) log.get("ipAddress"))).append("\",")
+              .append("\"timestamp\":\"").append(JsonUtil.escapeJson((String) log.get("timestamp"))).append("\",")
+              .append("\"blockHash\":\"").append(JsonUtil.escapeJson((String) log.get("blockHash"))).append("\"")
               .append("}");
             if (i < auditLogs.size() - 1) sb.append(",");
         }
@@ -85,41 +86,31 @@ public class ComprehensiveHealthService {
 
     private void parseLogsJson(String json) {
         try {
-            String[] items = json.split("\\{\"id\":");
-            for (int i = 1; i < items.length; i++) {
-                String b = items[i];
+            List<String> items = JsonUtil.extractJsonObjects(json);
+            if (items.isEmpty()) {
+                initInitialLogs();
+                return;
+            }
+            auditLogs.clear();
+            for (String b : items) {
+                String id = JsonUtil.extractString(b, "id");
+                if (id.isEmpty()) continue;
                 Map<String, Object> log = new HashMap<>();
-                log.put("id", extractField(b, "\"id\":\"", "\""));
-                log.put("eventType", extractField(b, "\"eventType\":\"", "\""));
-                log.put("details", extractField(b, "\"details\":\"", "\""));
-                log.put("status", extractField(b, "\"status\":\"", "\""));
-                log.put("ipAddress", extractField(b, "\"ipAddress\":\"", "\""));
-                log.put("timestamp", extractField(b, "\"timestamp\":\"", "\""));
-                log.put("blockHash", extractField(b, "\"blockHash\":\"", "\""));
+                log.put("id", id);
+                log.put("eventType", JsonUtil.extractString(b, "eventType", "HEALTH_DATA_ACCESS"));
+                log.put("details", JsonUtil.extractString(b, "details", "System audit event"));
+                log.put("status", JsonUtil.extractString(b, "status", "SUCCESS"));
+                log.put("ipAddress", JsonUtil.extractString(b, "ipAddress", "127.0.0.1"));
+                log.put("timestamp", JsonUtil.extractString(b, "timestamp", new Date().toString()));
+                log.put("blockHash", JsonUtil.extractString(b, "blockHash", "0x8f3c7e9a2b1d4f0c6e5a8b7c"));
                 auditLogs.add(log);
+            }
+            if (auditLogs.isEmpty()) {
+                initInitialLogs();
             }
         } catch (Exception e) {
             initInitialLogs();
         }
-    }
-
-    private String extractField(String block, String prefix, String suffix) {
-        int start = block.indexOf(prefix);
-        if (start == -1) {
-            int alt = block.indexOf(prefix.substring(prefix.indexOf(":") + 1));
-            if (alt == -1) return "";
-            start = alt;
-        } else {
-            start += prefix.length();
-        }
-        int end = block.indexOf(suffix, start);
-        if (end == -1) return "";
-        return block.substring(start, end).replace("\\\"", "\"");
-    }
-
-    private String escapeJson(String s) {
-        if (s == null) return "";
-        return s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
     }
 
     // 2. IDRS Diabetes Risk Score (ICMR-INDIAB Validated, Max 100)

@@ -8,7 +8,7 @@ import java.util.*;
 
 /**
  * ApnaVaidya Comprehensive Clinical Test Suite
- * Validates backend risk engines, pharmacovigilance, simulation regressions, and persistence.
+ * Validates backend risk engines, pharmacovigilance, simulation regressions, and persistence round-trip ID integrity.
  */
 public class ApnaVaidyaTest {
 
@@ -131,6 +131,57 @@ public class ApnaVaidyaTest {
             passed++;
         } catch (Throwable t) {
             System.err.println("  ✗ [FAIL] DatabaseManager Atomic Persistence: " + t.getMessage());
+            failed++;
+        }
+
+        // Test 7: Persistence Round-Trip ID Integrity (Medications, Reports, Audit Logs)
+        try {
+            MedicationService medService = new MedicationService();
+            List<MedicationItem> meds = medService.getMedicationsByProfile("user-arjun");
+            assert !meds.isEmpty() : "Medications list should not be empty";
+            
+            for (MedicationItem m : meds) {
+                assert m.getId() != null && !m.getId().trim().isEmpty() : "Medication ID must not be empty";
+                assert m.getId().startsWith("med-") : "Medication ID must start with med- prefix (got: " + m.getId() + ")";
+            }
+
+            // Test toggling specific medication
+            boolean toggled = medService.toggleMedicationStatus("med-ator-10");
+            assert toggled : "Should successfully toggle med-ator-10";
+
+            // Reload from disk to verify round-trip persistence with exact IDs
+            MedicationService reloadedMedService = new MedicationService();
+            List<MedicationItem> reloadedMeds = reloadedMedService.getMedicationsByProfile("user-arjun");
+            MedicationItem ator = reloadedMeds.stream()
+                .filter(m -> "med-ator-10".equals(m.getId()))
+                .findFirst()
+                .orElse(null);
+            assert ator != null : "med-ator-10 must exist in reloaded list";
+            assert ator.getId().equals("med-ator-10") : "Reloaded ID must equal med-ator-10";
+
+            // Verify Reports ID Integrity
+            ReportService reportService = new ReportService();
+            List<MedicalReport> reports = reportService.getAllReports();
+            assert !reports.isEmpty() : "Reports list should not be empty";
+            for (MedicalReport r : reports) {
+                assert r.getId() != null && !r.getId().trim().isEmpty() : "Report ID must not be empty";
+                assert r.getId().startsWith("rep-") : "Report ID must start with rep- (got: " + r.getId() + ")";
+            }
+
+            // Verify Audit Logs ID Integrity
+            ComprehensiveHealthService auditService = new ComprehensiveHealthService();
+            List<Map<String, Object>> logs = auditService.getAuditLogs();
+            assert !logs.isEmpty() : "Audit logs list should not be empty";
+            for (Map<String, Object> l : logs) {
+                String logId = (String) l.get("id");
+                assert logId != null && !logId.trim().isEmpty() : "Audit Log ID must not be empty";
+                assert logId.startsWith("audit-") : "Audit Log ID must start with audit- (got: " + logId + ")";
+            }
+
+            System.out.printf("  ✓ [PASS] Persistence Round-Trip ID Integrity: Verified (Meds, Reports, Audit Logs)%n");
+            passed++;
+        } catch (Throwable t) {
+            System.err.println("  ✗ [FAIL] Persistence Round-Trip ID Integrity: " + t.getMessage());
             failed++;
         }
 
