@@ -18,6 +18,7 @@ export default function ReportUploadModal({
   isOpen,
   onClose,
   activeProfile,
+  onUploadComplete,
   onReportAnalyzed
 }) {
   const [selectedPreset, setSelectedPreset] = useState(null);
@@ -49,12 +50,16 @@ export default function ReportUploadModal({
       } else {
         clearInterval(interval);
         setTimeout(() => {
+          const profileId = activeProfile?.id || 'user-arjun';
           const analyzedReport = analyzeUploadedFile(
-            typeof presetOrName === 'string' ? presetOrName : presetOrName.name,
-            activeProfile.id
+            typeof presetOrName === 'string' ? presetOrName : (presetOrName?.name || 'Comprehensive Health Report'),
+            profileId
           );
           setIsProcessing(false);
-          onReportAnalyzed(analyzedReport);
+          const callback = onUploadComplete || onReportAnalyzed;
+          if (typeof callback === 'function') {
+            callback(analyzedReport);
+          }
           onClose();
         }, 500);
       }
