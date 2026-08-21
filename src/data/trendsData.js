@@ -190,6 +190,50 @@ export const TRENDS_DATA = {
         guidance: 'Take thyroxine medication strictly on an empty stomach with plain water at least 45 minutes before morning tea.'
       }
     ]
+  },
+  'user-ananya': {
+    biomarkers: [
+      {
+        id: 'hb-pediatric',
+        name: 'Hemoglobin (Hb)',
+        category: 'Pediatric Hematology',
+        unit: 'g/dL',
+        minNormal: 11.5,
+        maxNormal: 14.5,
+        optimalTarget: '12.0 - 14.0 g/dL',
+        currentValue: 12.8,
+        changeDelta: '+0.6 g/dL (+4.9%)',
+        changeType: 'improving',
+        history: [
+          { date: 'Nov 2025', value: 12.2, status: 'NORMAL' },
+          { date: 'Feb 2026', value: 12.4, status: 'NORMAL' },
+          { date: 'May 2026', value: 12.6, status: 'NORMAL' },
+          { date: 'Aug 2026', value: 12.8, status: 'NORMAL' }
+        ],
+        aiTrendInsight: 'Hemoglobin levels are optimal and steady across growth tracking checks, reflecting robust dietary iron and protein intake.',
+        guidance: 'Continue iron-rich foods (green leafy vegetables, jaggery, lentils, pomegranate) paired with Vitamin C for absorption.'
+      },
+      {
+        id: 'vitd-pediatric',
+        name: 'Serum Vitamin D (25-OH)',
+        category: 'Pediatric Bone & Growth',
+        unit: 'ng/mL',
+        minNormal: 30,
+        maxNormal: 100,
+        optimalTarget: '30 - 60 ng/mL',
+        currentValue: 34.2,
+        changeDelta: '+6.2 ng/mL',
+        changeType: 'improving',
+        history: [
+          { date: 'Nov 2025', value: 28.0, status: 'LOW' },
+          { date: 'Feb 2026', value: 31.0, status: 'NORMAL' },
+          { date: 'May 2026', value: 32.8, status: 'NORMAL' },
+          { date: 'Aug 2026', value: 34.2, status: 'NORMAL' }
+        ],
+        aiTrendInsight: 'Vitamin D has successfully normalized into the healthy physiological range (34.2 ng/mL) supporting strong bone mineralization and pediatric immunity.',
+        guidance: 'Encourage 20-30 minutes of outdoor morning physical play and fortified milk intake.'
+      }
+    ]
   }
 };
 
@@ -223,5 +267,15 @@ export const PREVENTIVE_CARE_ALERTS = [
     urgency: 'MEDIUM',
     description: 'Evaluates osteopenia/osteoporosis risk and calcium retention.',
     recommendation: 'Discuss with orthopedic specialist at next visit.'
+  },
+  {
+    id: 'prev-4',
+    profileId: 'user-ananya',
+    title: 'Annual Pediatric Growth & Vision Screening',
+    category: 'Pediatric Health',
+    dueDate: 'Due at 8.5 Years',
+    urgency: 'LOW',
+    description: 'Annual pediatric milestone tracking, visual acuity test, and dental fluoride check.',
+    recommendation: 'Schedule routine pediatric wellness check with Dr. Neha Verma.'
   }
 ];

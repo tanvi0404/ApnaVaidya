@@ -12,10 +12,18 @@ import {
 } from 'lucide-react';
 
 export default function TrendChart({ biomarkers = [] }) {
-  const [selectedBiomarkerId, setSelectedBiomarkerId] = useState(biomarkers[0]?.id || '');
+  const safeBiomarkers = Array.isArray(biomarkers) && biomarkers.length > 0 ? biomarkers : [];
+  const [selectedBiomarkerId, setSelectedBiomarkerId] = useState(safeBiomarkers[0]?.id || '');
   const [hoveredPointIndex, setHoveredPointIndex] = useState(null);
 
-  if (!biomarkers || biomarkers.length === 0) {
+  // Sync selected biomarker when biomarkers change (profile switch)
+  React.useEffect(() => {
+    if (safeBiomarkers.length > 0 && !safeBiomarkers.some(b => b.id === selectedBiomarkerId)) {
+      setSelectedBiomarkerId(safeBiomarkers[0].id);
+    }
+  }, [safeBiomarkers, selectedBiomarkerId]);
+
+  if (safeBiomarkers.length === 0) {
     return (
       <div className="card-white p-8 text-center text-slate-500">
         <Activity className="w-8 h-8 mx-auto mb-2 text-slate-400" />
@@ -24,8 +32,17 @@ export default function TrendChart({ biomarkers = [] }) {
     );
   }
 
-  const activeBiomarker = biomarkers.find(b => b.id === selectedBiomarkerId) || biomarkers[0];
-  const history = activeBiomarker.history;
+  const activeBiomarker = safeBiomarkers.find(b => b.id === selectedBiomarkerId) || safeBiomarkers[0];
+  const history = activeBiomarker?.history || [];
+
+  if (!activeBiomarker || history.length === 0) {
+    return (
+      <div className="card-white p-8 text-center text-slate-500">
+        <Activity className="w-8 h-8 mx-auto mb-2 text-slate-400" />
+        <p className="text-sm font-medium">No biomarker data points recorded yet.</p>
+      </div>
+    );
+  }
 
   // Chart dimensions & math
   const width = 600;
@@ -33,9 +50,12 @@ export default function TrendChart({ biomarkers = [] }) {
   const paddingX = 50;
   const paddingY = 35;
 
+  const minNormal = typeof activeBiomarker.minNormal === 'number' ? activeBiomarker.minNormal : 0;
+  const maxNormal = typeof activeBiomarker.maxNormal === 'number' ? activeBiomarker.maxNormal : 100;
+
   const values = history.map(h => h.value);
-  const minVal = Math.min(...values, activeBiomarker.minNormal);
-  const maxVal = Math.max(...values, activeBiomarker.maxNormal);
+  const minVal = Math.min(...values, minNormal);
+  const maxVal = Math.max(...values, maxNormal);
   const valMargin = (maxVal - minVal) * 0.25 || 1;
   const chartMin = Math.max(0, minVal - valMargin);
   const chartMax = maxVal + valMargin;
@@ -63,11 +83,13 @@ export default function TrendChart({ biomarkers = [] }) {
   }, '');
 
   // Shaded area under path
-  const areaString = `${pathString} L ${points[points.length - 1].x} ${height - paddingY} L ${points[0].x} ${height - paddingY} Z`;
+  const areaString = points.length > 0 
+    ? `${pathString} L ${points[points.length - 1].x} ${height - paddingY} L ${points[0].x} ${height - paddingY} Z`
+    : '';
 
   // Normal range zone band
-  const normalYTop = getY(activeBiomarker.maxNormal);
-  const normalYBottom = getY(activeBiomarker.minNormal);
+  const normalYTop = getY(maxNormal);
+  const normalYBottom = getY(minNormal);
   const normalBandHeight = Math.abs(normalYBottom - normalYTop);
 
   const isImproving = activeBiomarker.changeType === 'improving';

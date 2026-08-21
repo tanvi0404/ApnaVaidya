@@ -154,5 +154,19 @@ export const PROFILE_WORKOUT_ROUTINES = {
       { day: 'Saturday', focus: 'Yoga & Flexibility', exercise: 'Bhujangasana, Balasana & Pranayama', duration: '30m', completed: false },
       { day: 'Sunday', focus: 'Rest & Reflection', exercise: 'Full Rest Day', duration: '—', completed: false }
     ]
+  },
+  'user-ananya': {
+    title: 'Pediatric Active Play & Agility Routine',
+    weeklyCommitment: 'Daily Active Play (45-60 mins)',
+    primaryGoal: 'Cardiorespiratory Endurance, Coordination & Growth Milestones',
+    weeklySchedule: [
+      { day: 'Monday', focus: 'Swimming & Water Play', exercise: 'Junior swimming strokes and pool agility drills', duration: '45m', completed: true },
+      { day: 'Tuesday', focus: 'Outdoor Cycling', exercise: 'Park bicycle riding with helmet & knee pads', duration: '35m', completed: true },
+      { day: 'Wednesday', focus: 'Gymnastics & Balance', exercise: 'Cartwheels, beam walking, and balance games', duration: '40m', completed: false },
+      { day: 'Thursday', focus: 'Junior Badminton / Tag', exercise: 'Hand-eye coordination drills and playground tag', duration: '45m', completed: false },
+      { day: 'Friday', focus: 'Roller Skating', exercise: 'Safe supervised roller skating in park rink', duration: '30m', completed: false },
+      { day: 'Saturday', focus: 'Family Nature Hike', exercise: 'Botanical garden walk and scavenger hunt', duration: '50m', completed: false },
+      { day: 'Sunday', focus: 'Free Play & Rest', exercise: 'Creative unstructured indoor/outdoor play', duration: '—', completed: false }
+    ]
   }
 };

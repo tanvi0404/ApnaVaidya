@@ -146,5 +146,63 @@ export const VACCINATION_RECORDS = {
       dose: '2-Dose Series',
       notes: 'Recommended for adults 50+ to prevent shingles neuralgia.'
     }
+  ],
+  'user-sunita': [
+    {
+      id: 'vac-6',
+      name: 'Influenza (Senior Quadrivalent Shot)',
+      dueDate: '15 Oct 2026',
+      status: 'UPCOMING',
+      lastGiven: '10 Oct 2025',
+      dose: '0.5 mL IM',
+      notes: 'Annual seasonal protection for seniors.'
+    },
+    {
+      id: 'vac-7',
+      name: 'Tdap Booster',
+      dueDate: '2029',
+      status: 'COMPLETED',
+      lastGiven: '15 Apr 2019',
+      dose: 'Single Booster',
+      notes: '10-year booster coverage active.'
+    }
+  ],
+  'user-ananya': [
+    {
+      id: 'vac-8',
+      name: 'MMR (Measles, Mumps, Rubella)',
+      dueDate: 'Lifelong Protection',
+      status: 'COMPLETED',
+      lastGiven: '12 Sep 2022',
+      dose: '2-Dose Complete',
+      notes: 'Childhood primary series fully administered.'
+    },
+    {
+      id: 'vac-9',
+      name: 'DTP Booster (5-Year School Entry)',
+      dueDate: 'Lifelong Coverage',
+      status: 'COMPLETED',
+      lastGiven: '10 Oct 2023',
+      dose: 'Booster 2',
+      notes: 'Protects against diphtheria, tetanus, and pertussis.'
+    },
+    {
+      id: 'vac-10',
+      name: 'Varicella (Chickenpox)',
+      dueDate: 'Lifelong Protection',
+      status: 'COMPLETED',
+      lastGiven: '15 May 2021',
+      dose: '2 Doses Complete',
+      notes: 'Full immunity documented.'
+    },
+    {
+      id: 'vac-11',
+      name: 'Annual Pediatric Flu Vaccine',
+      dueDate: '01 Nov 2026',
+      status: 'UPCOMING',
+      lastGiven: '15 Nov 2025',
+      dose: '0.5 mL Pediatric',
+      notes: 'Recommended annually ahead of winter season.'
+    }
   ]
 };

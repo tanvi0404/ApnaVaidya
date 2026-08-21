@@ -90,6 +90,54 @@ export const HEALTH_TIMELINE_EVENTS = {
       badgeColor: 'green',
       details: 'Dual action blood pressure control and nephroprotective coverage.'
     }
+  ],
+  'user-sunita': [
+    {
+      id: 'time-9',
+      date: '05 Aug 2026',
+      title: 'Thyroid Function Test (TSH & Free T4)',
+      category: 'Lab Test',
+      iconType: 'lab',
+      summary: 'Apollo Diagnostics. TSH: 5.85 uIU/mL (Elevated), FT4: 1.15 ng/dL (Normal).',
+      statusTag: 'Subclinical Hypothyroidism',
+      badgeColor: 'rose',
+      details: 'Evaluated subclinical thyroid elevation. Advice to maintain strict fasting window for thyroxine.'
+    },
+    {
+      id: 'time-10',
+      date: '12 Mar 2026',
+      title: 'Annual Gynecological & Bone Mineral Check',
+      category: 'Doctor Visit',
+      iconType: 'doctor',
+      summary: 'Fortis Hospital. Evaluated bone density risk and postmenopausal calcium balance.',
+      statusTag: 'Completed',
+      badgeColor: 'teal',
+      details: 'Recommended daily calcium supplementation and weight-bearing morning walks.'
+    }
+  ],
+  'user-ananya': [
+    {
+      id: 'time-11',
+      date: '10 Aug 2026',
+      title: 'Annual Pediatric Growth & Allergy Review',
+      category: 'Doctor Visit',
+      iconType: 'doctor',
+      summary: 'Max Hospital Pediatrics. Height: 128 cm, Weight: 26 kg (50th percentile).',
+      statusTag: 'Growth Optimal',
+      badgeColor: 'green',
+      details: 'Pediatrician noted excellent growth curve velocity and renewed seasonal allergy action plan.'
+    },
+    {
+      id: 'time-12',
+      date: '15 Feb 2026',
+      title: 'Pediatric Blood Count & Vitamin D Check',
+      category: 'Lab Test',
+      iconType: 'lab',
+      summary: 'Thyrocare Labs. Hemoglobin: 12.8 g/dL (Optimal), Vitamin D: 34.2 ng/mL.',
+      statusTag: 'All Optimal',
+      badgeColor: 'green',
+      details: 'Normal red blood cell count and healthy vitamin D baseline supporting bone mineralization.'
+    }
   ]
 };
 
@@ -130,6 +178,44 @@ export const WEARABLES_DATA = {
       { name: 'Resting / Casual', range: '< 95 bpm', duration: '20h 15m' },
       { name: 'Zone 2 (Brisk Walk)', range: '100 - 120 bpm', duration: '35 mins' },
       { name: 'Zone 3 (Moderate)', range: '120 - 135 bpm', duration: '8 mins' }
+    ]
+  },
+  'user-sunita': {
+    device: 'Garmin Venu 3S',
+    syncStatus: 'Live Synchronized',
+    lastSync: '5 minutes ago',
+    battery: '88%',
+    metrics: {
+      steps: { current: 5400, goal: 6000, unit: 'steps', percentage: 90 },
+      restingHeartRate: { current: 66, optimal: '60 - 74', unit: 'bpm', status: 'Optimal' },
+      heartRateVariability: { current: 48, optimal: '> 40', unit: 'ms', status: 'Good Recovery' },
+      spo2: { current: 98, optimal: '95 - 100', unit: '%', status: 'Optimal' },
+      activeCalories: { current: 310, goal: 400, unit: 'kcal', percentage: 78 },
+      sleepDuration: { current: 7.2, goal: 7.5, unit: 'hrs', percentage: 96 }
+    },
+    heartRateZones: [
+      { name: 'Resting / Casual', range: '< 95 bpm', duration: '19h 30m' },
+      { name: 'Zone 1 (Yoga & Strolls)', range: '95 - 110 bpm', duration: '40 mins' },
+      { name: 'Zone 2 (Cardio Walk)', range: '110 - 125 bpm', duration: '20 mins' }
+    ]
+  },
+  'user-ananya': {
+    device: 'Fitbit Ace 3 (Kids Edition)',
+    syncStatus: 'Live Synchronized',
+    lastSync: '1 minute ago',
+    battery: '94%',
+    metrics: {
+      steps: { current: 9800, goal: 10000, unit: 'steps', percentage: 98 },
+      restingHeartRate: { current: 82, optimal: '75 - 95', unit: 'bpm (Pediatric)', status: 'Optimal' },
+      heartRateVariability: { current: 68, optimal: '> 50', unit: 'ms', status: 'High Energy' },
+      spo2: { current: 99, optimal: '95 - 100', unit: '%', status: 'Optimal' },
+      activeCalories: { current: 460, goal: 500, unit: 'kcal', percentage: 92 },
+      sleepDuration: { current: 9.1, goal: 9.0, unit: 'hrs', percentage: 101 }
+    },
+    heartRateZones: [
+      { name: 'Rest / Classroom', range: '< 100 bpm', duration: '16h 20m' },
+      { name: 'Playground Activity', range: '110 - 140 bpm', duration: '1h 15m' },
+      { name: 'High Energy Play (Sports)', range: '140 - 165 bpm', duration: '28 mins' }
     ]
   }
 };

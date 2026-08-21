@@ -76,5 +76,10 @@ export const PATIENT_CONCERNS_SEED = {
     'Afternoon fatigue despite 7 hours of nocturnal sleep.',
     'Mild cold intolerance in hands and feet.',
     'Inquiring about Levothyroxine dose titration.'
+  ],
+  'user-ananya': [
+    'Seasonal pollen and dust-triggered sneezing / allergic rhinitis.',
+    'Reviewing school emergency protocol for peanut/shellfish allergy.',
+    'Annual height and weight velocity growth curve review.'
   ]
 };

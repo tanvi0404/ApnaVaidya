@@ -116,5 +116,39 @@ export const MEDICATIONS_DATA = {
       status: 'pending',
       prescribedBy: 'Dr. Rajeshwari Nair'
     }
+  ],
+  'user-ananya': [
+    {
+      id: 'med-8',
+      name: 'Cetirizine Syrup (Pediatric)',
+      dosage: '2.5 mg / 5 mL',
+      form: 'Syrup',
+      frequency: 'As Needed (PRN)',
+      timeSlot: 'Night (8:30 PM)',
+      mealTiming: 'After Dinner',
+      purpose: 'Seasonal Allergic Rhinitis Relief',
+      startDate: '10 Aug 2026',
+      totalPills: 1,
+      remainingPills: 1,
+      refillThreshold: 1,
+      status: 'pending',
+      prescribedBy: 'Dr. Neha Verma (Pediatrician)'
+    },
+    {
+      id: 'med-9',
+      name: 'Vitamin D3 Pediatric Drops',
+      dosage: '400 IU / drop',
+      form: 'Oral Drops',
+      frequency: 'Daily',
+      timeSlot: 'Morning (8:30 AM)',
+      mealTiming: 'With Breakfast / Milk',
+      purpose: 'Pediatric Growth & Immunity',
+      startDate: '01 Jan 2026',
+      totalPills: 30,
+      remainingPills: 20,
+      refillThreshold: 5,
+      status: 'taken',
+      prescribedBy: 'Dr. Neha Verma (Pediatrician)'
+    }
   ]
 };

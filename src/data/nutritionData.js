@@ -330,5 +330,44 @@ export const PROFILE_MEAL_PLANS = {
         notes: 'Gentle on evening metabolism.'
       }
     ]
+  },
+  'user-ananya': {
+    targetCalories: 1550,
+    goal: 'Pediatric Growth, Bone Mineralization & Nut-Free Allergy Safety',
+    macros: { protein: '45g (15%)', carbs: '220g (55%)', fats: '50g (30%)', fiber: '24g' },
+    schedule: [
+      {
+        mealType: 'Morning Milk & Breakfast (8:00 AM)',
+        name: 'Fortified Milk + Moong Dal Chilla with Mild Mint Chutney',
+        calories: 360,
+        protein: '16g',
+        recipeId: 'rec-1',
+        notes: 'Strictly peanut-free & shellfish-free. High bioavailable calcium and iron.'
+      },
+      {
+        mealType: 'School Lunch Box (12:45 PM)',
+        name: 'Paneer Stuffed Whole Wheat Roti Roll + Cucumber Slices',
+        calories: 440,
+        protein: '18g',
+        recipeId: 'rec-4',
+        notes: 'Balanced carbs and protein to sustain afternoon classroom concentration.'
+      },
+      {
+        mealType: 'After-School Snack (4:30 PM)',
+        name: 'Fresh Fruit Bowl (Pomegranate, Apple, Banana) + Roasted Makhana',
+        calories: 220,
+        protein: '5g',
+        recipeId: 'rec-3',
+        notes: 'Rich in Vitamin C, potassium, and antioxidants for pediatric immunity.'
+      },
+      {
+        mealType: 'Dinner (7:30 PM)',
+        name: 'Mild Moong Dal Khichdi with Steamed Carrots & Peas + Ghee',
+        calories: 380,
+        protein: '12g',
+        recipeId: 'rec-2',
+        notes: 'Gentle on digestion, taken 2 hours before 9:00 PM bedtime.'
+      }
+    ]
   }
 };
