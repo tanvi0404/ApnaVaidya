@@ -14,7 +14,8 @@ import {
   Menu,
   X,
   LogOut,
-  UserPlus
+  UserPlus,
+  Edit3
 } from 'lucide-react';
 import { FAMILY_PROFILES } from '../../data/mockData';
 
@@ -31,7 +32,8 @@ export default function Navbar({
   profiles = FAMILY_PROFILES,
   authUser = null,
   onLogout = () => {},
-  onOpenAddMember = () => {}
+  onOpenAddMember = () => {},
+  onOpenEditProfile = () => {}
 }) {
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const [langDropdownOpen, setLangDropdownOpen] = useState(false);
@@ -209,6 +211,17 @@ export default function Navbar({
                   </div>
 
                   <div className="mt-2 pt-2 border-t border-slate-100 space-y-1">
+                    <button
+                      onClick={() => {
+                        setProfileDropdownOpen(false);
+                        onOpenEditProfile();
+                      }}
+                      className="w-full flex items-center justify-center gap-2 p-2 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-100 transition-colors"
+                    >
+                      <Edit3 className="w-3.5 h-3.5 text-brand-green-600" />
+                      <span>Edit Active Profile</span>
+                    </button>
+
                     <button
                       onClick={() => {
                         setProfileDropdownOpen(false);

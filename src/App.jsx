@@ -7,6 +7,7 @@ import ReportUploadModal from './components/reports/ReportUploadModal';
 import FullHealthDossierModal from './components/dossier/FullHealthDossierModal';
 import AuthModal from './components/auth/AuthModal';
 import AddFamilyMemberModal from './components/layout/AddFamilyMemberModal';
+import EditProfileModal from './components/layout/EditProfileModal';
 
 // Code-split view components for optimal sub-150KB bundle performance
 const HealthDashboard = lazy(() => import('./components/dashboard/HealthDashboard'));
@@ -53,7 +54,8 @@ import {
   ArrowRight,
   Pill,
   Stethoscope, 
-  FolderLock
+  FolderLock,
+  Edit3
 } from 'lucide-react';
 
 function ViewLoadingSkeleton() {
@@ -153,6 +155,7 @@ export default function App() {
   const [dossierModalOpen, setDossierModalOpen] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [addFamilyModalOpen, setAddFamilyModalOpen] = useState(false);
+  const [editProfileModalOpen, setEditProfileModalOpen] = useState(false);
 
   // Context passing for Chikitsak Chat
   const [activeChatContext, setActiveChatContext] = useState(null);
@@ -204,6 +207,27 @@ export default function App() {
     try {
       localStorage.setItem('apnavaidya_active_profile_id', safeMember.id);
     } catch (_) {}
+  };
+
+  const handleUpdateProfile = (updatedProfile) => {
+    const safeProf = normalizeProfile(updatedProfile);
+    setFamilyProfiles(prev => {
+      const updatedList = prev.map(p => p.id === safeProf.id ? safeProf : p);
+      try {
+        localStorage.setItem('apnavaidya_custom_profiles', JSON.stringify(updatedList));
+      } catch (_) {}
+      return updatedList;
+    });
+    setActiveProfile(safeProf);
+    const newNotif = {
+      id: `notif-${Date.now()}`,
+      title: 'Profile Updated',
+      message: `${safeProf.name}'s clinical parameters and demographics have been saved.`,
+      timestamp: 'Just now',
+      type: 'profile_updated',
+      unread: true
+    };
+    setNotifications(prev => [newNotif, ...prev]);
   };
 
   const handleLogout = () => {
@@ -307,6 +331,7 @@ export default function App() {
         authUser={authUser}
         onLogout={handleLogout}
         onOpenAddMember={() => setAddFamilyModalOpen(true)}
+        onOpenEditProfile={() => setEditProfileModalOpen(true)}
       />
 
       {/* Main Full-Width Layout */}
@@ -351,6 +376,15 @@ export default function App() {
             </div>
 
             <div className="flex items-center gap-2">
+              <button
+                onClick={() => setEditProfileModalOpen(true)}
+                className="btn-outline-white text-xs py-1.5 px-3 flex items-center gap-1.5 font-bold"
+                title="Edit Health Profile & Demographics"
+              >
+                <Edit3 className="w-3.5 h-3.5 text-brand-green-600" />
+                <span>Edit Profile</span>
+              </button>
+
               <button
                 onClick={() => setDossierModalOpen(true)}
                 className="btn-outline-white text-xs py-1.5 px-3 flex items-center gap-1.5 font-bold"
@@ -575,6 +609,14 @@ export default function App() {
         isOpen={addFamilyModalOpen}
         onClose={() => setAddFamilyModalOpen(false)}
         onAddMember={handleAddFamilyMember}
+      />
+
+      {/* Edit Profile Modal */}
+      <EditProfileModal
+        isOpen={editProfileModalOpen}
+        onClose={() => setEditProfileModalOpen(false)}
+        activeProfile={activeProfile}
+        onUpdateProfile={handleUpdateProfile}
       />
 
     </div>
