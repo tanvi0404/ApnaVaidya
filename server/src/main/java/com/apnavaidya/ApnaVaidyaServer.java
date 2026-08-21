@@ -828,6 +828,9 @@ public class ApnaVaidyaServer {
         req.setUserMessage(extractJsonString(body, "userMessage"));
         req.setLanguage(extractJsonString(body, "language"));
         req.setProfileName(extractJsonString(body, "profileName"));
+        req.setProfileAge(extractJsonInt(body, "profileAge", 30));
+        req.setProfileGender(extractJsonString(body, "profileGender"));
+        req.setReportContext(extractJsonString(body, "reportContext"));
         return req;
     }
 

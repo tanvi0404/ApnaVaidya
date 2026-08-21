@@ -74,7 +74,15 @@ public class ChikitsakAiService {
                 content = "**HbA1c & Glycemic Control Insights:**\n\n1. **What HbA1c Measures:** It reflects 90-day average blood glucose.\n2. **Your Current Level:** Your latest reading is **7.4%** (Target for managed diabetes is **< 7.0%**).\n3. **Practical Steps:** Schedule 20-30 minute walks after lunch and dinner to activate muscle GLUT-4 glucose transporters.";
             }
         } else {
-            content = "**ApnaVaidya Clinical Context Analysis:**\n\nI have reviewed your active profile (**" + request.getProfileName() + "**, " + request.getProfileAge() + "y) and linked diagnostic records.\n\n- **Focus:** Balanced whole-food nutrition, regular hydration, and daily Zone-2 aerobic movement.\n\nFeel free to ask about any specific lab biomarker, medication timing, or customized recipe!";
+            if (request.getProfileAge() > 0 && request.getProfileAge() < 18) {
+                content = "**ApnaVaidya Pediatric Health Context:**\n\n"
+                    + "I have reviewed the pediatric health profile for **" + request.getProfileName() + "** (" + request.getProfileAge() + "y, " + request.getProfileGender() + ") and linked diagnostic records.\n\n"
+                    + "- **Pediatric Focus:** Age-appropriate balanced childhood nutrition, growth milestones, safe hydration, and active physical play.\n"
+                    + "- **Allergy Safety:** Please ensure allergy cautions (e.g., Peanuts, Shellfish) and pediatric weight-based dosing guidelines are always verified with a pediatrician.\n\n"
+                    + "Feel free to ask about childhood immunization schedules, pediatric growth parameters, or balanced school meal planning!";
+            } else {
+                content = "**ApnaVaidya Clinical Context Analysis:**\n\nI have reviewed your active profile (**" + request.getProfileName() + "**, " + request.getProfileAge() + "y) and linked diagnostic records.\n\n- **Focus:** Balanced whole-food nutrition, regular hydration, and daily Zone-2 aerobic movement.\n\nFeel free to ask about any specific lab biomarker, medication timing, or customized recipe!";
+            }
         }
 
         Map<String, String> explain = new HashMap<>();

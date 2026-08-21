@@ -133,8 +133,12 @@ export function generateChikitsakResponse(
 
   // Case D: General / Health Question
   else {
-    const profileGoals = activeProfile?.goals?.length ? activeProfile.goals.join(', ') : 'Healthy Longevity';
-    if (language === 'hi') {
+    const isPediatric = (Number(activeProfile?.age) || 30) < 18;
+    const profileGoals = activeProfile?.goals?.length ? activeProfile.goals.join(', ') : (isPediatric ? 'Child Growth & Wellness' : 'Healthy Longevity');
+    
+    if (isPediatric) {
+      content = `**ApnaVaidya Pediatric Health Context:**\n\nI have reviewed the pediatric health profile for **${activeProfile.name || 'Ananya Sharma'}** (${activeProfile.age || 8}y, ${activeProfile.gender || 'Female'}) and linked diagnostic records.\n\n- **Pediatric Focus:** Age-appropriate balanced childhood nutrition, growth milestones, safe hydration, and active physical play.\n- **Allergy Safety:** Please ensure documented allergy precautions (${activeProfile.allergies?.join(', ') || 'Peanuts, Shellfish'}) are strictly observed.\n\nFeel free to ask about childhood immunization schedules, pediatric growth parameters, or balanced school meal planning!`;
+    } else if (language === 'hi') {
       content = `**अपनावैद्य (ApnaVaidya) स्वास्थ्य परामर्श:**\n\nमैंने आपकी स्वास्थ्य प्रोफ़ाइल (${activeProfile.name || 'User'}, ${activeProfile.age || 30} वर्ष) और हालिया रिपोर्ट्स का अध्ययन किया है。\n\n- **मुख्य बिंदु:** आपके स्वास्थ्य लक्ष्यों (${profileGoals}) को ध्यान में रखते हुए संतुलित पोषण, नियमित जल सेवन और दैनिक शारीरिक गतिविधि सबसे महत्वपूर्ण स्तंभ हैं।\n- **सलाह:** यदि आप किसी विशेष रिपोर्ट या लक्षण के बारे में पूछना चाहते हैं, तो कृपया नीचे दिए गए सुझावों में से चुनें।`;
     } else if (language === 'hg') {
       content = `**ApnaVaidya Health Assistance:**\n\nMaine aapki health profile (${activeProfile.name || 'User'}, ${activeProfile.age || 30}y) aur active lab records check kiye hain.\n\n- **Health Focus:** Aapke current goals: ${profileGoals}.\n- **Action:** Aap kisi bhi report value (jaise LDL, HbA1c, TSH) ya nutrition ke baare mein freely pooch sakte hain!`;

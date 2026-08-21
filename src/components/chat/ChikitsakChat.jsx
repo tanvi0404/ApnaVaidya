@@ -34,26 +34,41 @@ export default function ChikitsakChat({
   const [speakingMessageId, setSpeakingMessageId] = useState(null);
   const messagesEndRef = useRef(null);
 
-  // Initial greeting
-  const [messages, setMessages] = useState([
-    {
-      id: 'msg-1',
+  // Initial greeting helper
+  const createInitialGreeting = (profile, lang = 'en') => {
+    const isPediatric = (Number(profile?.age) || 30) < 18;
+    return {
+      id: `msg-init-${profile?.id || 'default'}`,
       sender: 'assistant',
-      text: `Namaste! I am Chikitsak AI, your personal healthcare education companion. I'm currently reviewing health records for ${activeProfile.name}. How can I assist you with your lab reports, medications, or wellness today?`,
+      text: isPediatric
+        ? `Namaste! I am Chikitsak AI, reviewing pediatric health records for ${profile?.name || 'Patient'} (${profile?.age || 8}y). How can I assist with pediatric nutrition, growth milestones, or immunization schedules today?`
+        : `Namaste! I am Chikitsak AI, your personal healthcare education companion. I'm currently reviewing health records for ${profile?.name || 'Patient'} (${profile?.age || 30}y). How can I assist you with your lab reports, medications, or wellness today?`,
       timestamp: 'Just now',
-      language: 'en',
+      language: lang,
       citations: ['ICMR Clinical Practice Guidelines', 'AIIMS Medical Guidelines'],
       explainability: {
-        profileGrounding: `${activeProfile.name}, ${activeProfile.age}y, ${activeProfile.gender}, ${activeProfile.bloodGroup}`,
+        profileGrounding: `${profile?.name}, ${profile?.age}y, ${profile?.gender}, ${profile?.bloodGroup}`,
         reportContext: 'Health profile baseline initialized',
         ragEvidence: 'Personalized patient communication protocol (Java 17 RAG)',
         safetyPolicy: 'Informational education only — not a doctor replacement.'
       }
-    }
-  ]);
+    };
+  };
+
+  const [messages, setMessages] = useState([createInitialGreeting(activeProfile, selectedLanguage)]);
+
+  // Reset greeting whenever active profile switches
+  useEffect(() => {
+    setMessages([createInitialGreeting(activeProfile, selectedLanguage)]);
+  }, [activeProfile.id]);
 
   // Prompt suggestions
-  const suggestedPrompts = [
+  const suggestedPrompts = (Number(activeProfile?.age) || 30) < 18 ? [
+    { label: 'Pediatric Balanced Nutrition', text: `What is the recommended daily protein, calcium, and micronutrient intake for an ${activeProfile.age}-year-old child?` },
+    { label: 'Childhood Growth Milestones', text: `Can you explain standard growth charts and pediatric physical activity guidelines for ${activeProfile.name}?` },
+    { label: 'Peanut & Shellfish Allergy Safety', text: `What essential emergency precautions and label-reading tips should we follow for peanut and shellfish allergies?` },
+    { label: 'School Lunch Box Ideas', text: `Can you suggest healthy, nut-free Indian school lunch box ideas rich in iron and calcium?` }
+  ] : [
     { label: 'What does elevated LDL mean?', text: 'What does elevated LDL cholesterol mean for my heart health?' },
     { label: 'Can I exercise with high blood pressure?', text: 'Is it safe for me to do cardio workouts with my current blood pressure?' },
     { label: 'Explain HbA1c in Hindi (हिन्दी)', text: 'HbA1c test kya hota hai aur iska normal level kya hona chahiye?' },
