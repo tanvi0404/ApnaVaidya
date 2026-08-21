@@ -13,7 +13,8 @@ import {
   UserCheck,
   Menu,
   X,
-  LogOut
+  LogOut,
+  UserPlus
 } from 'lucide-react';
 import { FAMILY_PROFILES } from '../../data/mockData';
 
@@ -29,7 +30,8 @@ export default function Navbar({
   onToggleMobileSidebar,
   profiles = FAMILY_PROFILES,
   authUser = null,
-  onLogout = () => {}
+  onLogout = () => {},
+  onOpenAddMember = () => {}
 }) {
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const [langDropdownOpen, setLangDropdownOpen] = useState(false);
@@ -207,6 +209,17 @@ export default function Navbar({
                   </div>
 
                   <div className="mt-2 pt-2 border-t border-slate-100 space-y-1">
+                    <button
+                      onClick={() => {
+                        setProfileDropdownOpen(false);
+                        onOpenAddMember();
+                      }}
+                      className="w-full flex items-center justify-center gap-2 p-2 rounded-xl text-xs font-bold text-brand-green-700 hover:bg-brand-green-50 transition-colors"
+                    >
+                      <UserPlus className="w-3.5 h-3.5" />
+                      <span>+ Add Family Member</span>
+                    </button>
+
                     <button
                       onClick={() => {
                         setProfileDropdownOpen(false);

@@ -6,6 +6,7 @@ import NotificationDrawer from './components/layout/NotificationDrawer';
 import ReportUploadModal from './components/reports/ReportUploadModal';
 import FullHealthDossierModal from './components/dossier/FullHealthDossierModal';
 import AuthModal from './components/auth/AuthModal';
+import AddFamilyMemberModal from './components/layout/AddFamilyMemberModal';
 
 // Code-split view components for optimal sub-150KB bundle performance
 const HealthDashboard = lazy(() => import('./components/dashboard/HealthDashboard'));
@@ -81,12 +82,18 @@ export default function App() {
     }
   });
 
-  // Dynamic Family Profiles (Preloaded + Registered Custom Profiles)
+  // Dynamic Family Profiles (Preloaded for Demo or User's Own Family for Personal Accounts)
   const [familyProfiles, setFamilyProfiles] = useState(() => {
     try {
+      const savedUser = localStorage.getItem('apnavaidya_auth_user');
+      const user = savedUser ? JSON.parse(savedUser) : null;
+      if (user?.isDemo) {
+        return FAMILY_PROFILES;
+      }
       const custom = localStorage.getItem('apnavaidya_custom_profiles');
       const customList = custom ? JSON.parse(custom) : [];
-      return [...customList, ...FAMILY_PROFILES];
+      if (customList.length > 0) return customList;
+      return user ? [user] : FAMILY_PROFILES;
     } catch (_) {
       return FAMILY_PROFILES;
     }
@@ -114,6 +121,7 @@ export default function App() {
   const [reportUploadModalOpen, setReportUploadModalOpen] = useState(false);
   const [dossierModalOpen, setDossierModalOpen] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [addFamilyModalOpen, setAddFamilyModalOpen] = useState(false);
 
   // Context passing for Chikitsak Chat
   const [activeChatContext, setActiveChatContext] = useState(null);
@@ -124,32 +132,50 @@ export default function App() {
   // Electronic Medical Reports List
   const [reportsList, setReportsList] = useState(PRELOADED_REPORTS);
 
-  const handleLogin = (user, profile) => {
-    setAuthUser(user);
+  const handleLogin = (user, profile, isDemo = false) => {
+    const sessionUser = { ...user, isDemo };
+    setAuthUser(sessionUser);
     try {
-      localStorage.setItem('apnavaidya_auth_user', JSON.stringify(user));
+      localStorage.setItem('apnavaidya_auth_user', JSON.stringify(sessionUser));
     } catch (_) {}
 
-    if (profile) {
-      setFamilyProfiles(prev => {
-        const exists = prev.some(p => p.id === profile.id);
-        const updated = exists ? prev : [profile, ...prev];
-        try {
-          const customOnly = updated.filter(p => !FAMILY_PROFILES.some(fp => fp.id === p.id));
-          localStorage.setItem('apnavaidya_custom_profiles', JSON.stringify(customOnly));
-        } catch (_) {}
-        return updated;
-      });
-      setActiveProfile(profile);
+    if (isDemo) {
+      setFamilyProfiles(FAMILY_PROFILES);
+      setActiveProfile(profile || FAMILY_PROFILES[0]);
       try {
+        localStorage.setItem('apnavaidya_active_profile_id', (profile || FAMILY_PROFILES[0]).id);
+        localStorage.removeItem('apnavaidya_custom_profiles');
+      } catch (_) {}
+    } else {
+      const userProfiles = [profile];
+      setFamilyProfiles(userProfiles);
+      try {
+        localStorage.setItem('apnavaidya_custom_profiles', JSON.stringify(userProfiles));
         localStorage.setItem('apnavaidya_active_profile_id', profile.id);
       } catch (_) {}
+      setActiveProfile(profile);
     }
+  };
+
+  const handleAddFamilyMember = (newMember) => {
+    setFamilyProfiles(prev => {
+      const updated = [...prev, newMember];
+      try {
+        localStorage.setItem('apnavaidya_custom_profiles', JSON.stringify(updated));
+      } catch (_) {}
+      return updated;
+    });
+    setActiveProfile(newMember);
+    try {
+      localStorage.setItem('apnavaidya_active_profile_id', newMember.id);
+    } catch (_) {}
   };
 
   const handleLogout = () => {
     try {
       localStorage.removeItem('apnavaidya_auth_user');
+      localStorage.removeItem('apnavaidya_custom_profiles');
+      localStorage.removeItem('apnavaidya_active_profile_id');
     } catch (_) {}
     setAuthUser(null);
   };
@@ -245,6 +271,7 @@ export default function App() {
         profiles={familyProfiles}
         authUser={authUser}
         onLogout={handleLogout}
+        onOpenAddMember={() => setAddFamilyModalOpen(true)}
       />
 
       {/* Main Full-Width Layout */}
@@ -506,6 +533,13 @@ export default function App() {
         onClose={() => setDossierModalOpen(false)}
         activeProfile={activeProfile}
         reports={displayedReports}
+      />
+
+      {/* Add Family Member Modal */}
+      <AddFamilyMemberModal
+        isOpen={addFamilyModalOpen}
+        onClose={() => setAddFamilyModalOpen(false)}
+        onAddMember={handleAddFamilyMember}
       />
 
     </div>

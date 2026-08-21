@@ -128,9 +128,10 @@ export default function AuthModal({ onLogin }) {
         name: profile.name,
         email: `${profile.id.replace('user-', '')}@apnavaidya.in`,
         mobile: '+91 98765 43210',
-        activeProfileId: profile.id
+        activeProfileId: profile.id,
+        isDemo: true
       };
-      onLogin(user, profile);
+      onLogin(user, profile, true);
       setLoading(false);
     }, 400);
   };
@@ -151,9 +152,28 @@ export default function AuthModal({ onLogin }) {
         const matched = FAMILY_PROFILES.find(p => 
           p.name.toLowerCase().includes(loginIdentifier.toLowerCase()) || 
           p.id.toLowerCase().includes(loginIdentifier.toLowerCase())
-        ) || FAMILY_PROFILES[0];
+        );
 
-        onLogin(res.user, matched);
+        const isDemo = Boolean(matched);
+        const profileToUse = matched || {
+          id: res.user.id || `user-${Date.now()}`,
+          name: res.user.name,
+          relationship: 'Self (Account Owner)',
+          age: res.user.age || 30,
+          gender: res.user.gender || 'Male',
+          bloodGroup: res.user.bloodGroup || 'B+',
+          avatarColor: 'from-brand-green-600 to-teal-700',
+          avatarInitials: res.user.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) || 'AV',
+          weight: '68 kg',
+          height: '170 cm',
+          bmi: 23.5,
+          conditions: [],
+          allergies: [],
+          goals: ['General Health Optimization'],
+          dietPreference: 'Vegetarian'
+        };
+
+        onLogin(res.user, profileToUse, isDemo);
       } else {
         setErrorMsg(res?.error || 'Invalid credentials. Please check and retry.');
       }
@@ -214,7 +234,7 @@ export default function AuthModal({ onLogin }) {
           }
         };
 
-        onLogin(res.user, newProfile);
+        onLogin(res.user, newProfile, false);
       } else {
         setErrorMsg(res?.error || 'Registration failed. Please try again.');
       }
