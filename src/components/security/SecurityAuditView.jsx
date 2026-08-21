@@ -200,28 +200,43 @@ export default function SecurityAuditView({ activeProfile }) {
         </div>
 
         <div className="divide-y divide-slate-100 overflow-x-auto">
-          {logs.map((log) => (
-            <div key={log.id} className="py-3.5 flex items-start justify-between gap-4 text-xs">
-              <div className="flex items-start gap-3 min-w-[200px] flex-1">
-                <div className="p-2 rounded-xl bg-emerald-50 text-emerald-800 font-bold mt-0.5 flex-shrink-0">
-                  <Eye className="w-4 h-4" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <strong className="text-slate-900">{log.action.replace(/_/g, ' ')}</strong>
-                    <span className="badge-neutral text-[10px]">{log.actor}</span>
-                    <span className="text-[10px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.2 rounded-full">
-                      {log.status}
-                    </span>
+          {logs.map((log) => {
+            const logAction = log.action || log.eventType || 'HEALTH_DATA_ACCESS';
+            const logActor = log.actor || 'System Engine';
+            
+            return (
+              <div key={log.id} className="py-3.5 flex items-start justify-between gap-4 text-xs">
+                <div className="flex items-start gap-3 min-w-[200px] flex-1">
+                  <div className="p-2 rounded-xl bg-emerald-50 text-emerald-800 font-bold mt-0.5 flex-shrink-0">
+                    <Eye className="w-4 h-4" />
                   </div>
-                  <p className="text-slate-600 mt-1">{log.details}</p>
-                  <div className="text-[11px] text-slate-400 mt-1">
-                    IP: {log.ipAddress} • {log.timestamp}
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <strong className="text-slate-900">{logAction.replace(/_/g, ' ')}</strong>
+                      <span className="badge-neutral text-[10px]">{logActor}</span>
+                      <span className="text-[10px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.2 rounded-full">
+                        {log.status || 'LOGGED'}
+                      </span>
+                    </div>
+                    <p className="text-slate-600 mt-1">{log.details}</p>
+                    <div className="text-[11px] text-slate-400 mt-1 flex items-center gap-2 flex-wrap">
+                      <span>IP: {log.ipAddress || '127.0.0.1'}</span>
+                      <span>•</span>
+                      <span>{log.timestamp}</span>
+                      {log.blockHash && (
+                        <>
+                          <span>•</span>
+                          <span className="font-mono text-emerald-800 bg-emerald-50/70 px-1.5 py-0.5 rounded text-[10px]">
+                            Hash: {log.blockHash.substring(0, 14)}...
+                          </span>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
