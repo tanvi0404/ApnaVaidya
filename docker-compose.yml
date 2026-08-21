@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  apnavaidya:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: apnavaidya_app
+    ports:
+      - "8080:8080" # Java 17 REST API
+      - "3000:3000" # Web UI
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+    volumes:
+      - apnavaidya_data:/app/server/data
+    restart: unless-stopped
+
+volumes:
+  apnavaidya_data:
+    driver: local

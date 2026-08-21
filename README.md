@@ -78,6 +78,42 @@ Open **`http://localhost:5173/`** (or `http://localhost:5174/`) in your browser.
 
 ---
 
+## 🌐 Production Deployment Guide
+
+ApnaVaidya is fully configured for seamless, 1-click deployment across all modern cloud platforms:
+
+### ⚡ Option 1: Vercel (Recommended for Web)
+1. Import repository into [Vercel](https://vercel.com).
+2. Framework Preset: **Vite**.
+3. Build Command: `npm run build` (auto-detected via `vercel.json`).
+4. Output Directory: `dist`.
+5. Click **Deploy**. Vercel will deploy the complete SPA with automatic route rewrites and asset caching.
+
+### 🌐 Option 2: Netlify
+1. Import repository into [Netlify](https://netlify.com).
+2. Build Command: `npm run build`.
+3. Publish directory: `dist`.
+4. Deploy! `netlify.toml` and `public/_redirects` automatically configure SPA routing.
+
+### 🐳 Option 3: Docker & Docker Compose (Full Stack: Java Backend + React Frontend)
+Run both the Java 17 REST API and Web App in a single container:
+```bash
+# Build and launch with Docker Compose
+docker compose up --build -d
+```
+- **Web App**: `http://localhost:3000`
+- **Java REST API**: `http://localhost:8080/api/health`
+
+### ☁️ Option 4: Render / Railway
+- **Render**: Connect repo; `render.yaml` automatically creates the Docker web service.
+- **Railway**: Connect repo; Railway detects `Dockerfile` and deploys both backend and frontend ports.
+
+### 💻 Option 5: 1-Click Local Batch Execution
+- **Windows**: Double-click `start-local.bat`
+- **Linux / macOS**: Run `./start-local.sh`
+
+---
+
 ## 🔌 Java REST API Endpoints
 
 | Endpoint | Method | Functionality |

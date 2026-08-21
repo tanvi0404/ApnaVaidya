@@ -1,0 +1,13 @@
+services:
+  # Web Service running Full Stack Docker Container
+  - type: web
+    name: apna-vaidya
+    env: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
