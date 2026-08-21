@@ -71,6 +71,36 @@ function ViewLoadingSkeleton() {
   );
 }
 
+function normalizeProfile(p) {
+  if (!p) return FAMILY_PROFILES[0];
+  const initials = p.avatarInitials || (p.name ? p.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) : 'AV');
+  const avatarColor = p.avatarColor || (p.gender === 'Female' ? 'from-rose-500 to-pink-600' : 'from-brand-green-600 to-teal-700');
+  return {
+    ...p,
+    id: p.id || `user-${Date.now()}`,
+    name: p.name || 'Patient',
+    relationship: p.relationship || 'Self (Account Owner)',
+    age: Number(p.age) || 30,
+    gender: p.gender || 'Male',
+    bloodGroup: p.bloodGroup || 'B+',
+    avatarInitials: initials,
+    avatarColor: avatarColor,
+    height: p.height || '170 cm',
+    weight: p.weight || '68 kg',
+    bmi: p.bmi || 23.5,
+    conditions: Array.isArray(p.conditions) ? p.conditions : [],
+    allergies: Array.isArray(p.allergies) ? p.allergies : [],
+    goals: Array.isArray(p.goals) ? p.goals : ['General Health Optimization'],
+    dietPreference: p.dietPreference || 'Vegetarian',
+    lifestyle: p.lifestyle || {
+      nutrition: 'Good',
+      activity: 'Active (Walking & Cardio)',
+      sleep: '7.5 hrs (Restful)',
+      hydration: '2.5 L / 3.0 L'
+    }
+  };
+}
+
 export default function App() {
   // Authentication State
   const [authUser, setAuthUser] = useState(() => {
@@ -88,14 +118,14 @@ export default function App() {
       const savedUser = localStorage.getItem('apnavaidya_auth_user');
       const user = savedUser ? JSON.parse(savedUser) : null;
       if (user?.isDemo) {
-        return FAMILY_PROFILES;
+        return FAMILY_PROFILES.map(normalizeProfile);
       }
       const custom = localStorage.getItem('apnavaidya_custom_profiles');
       const customList = custom ? JSON.parse(custom) : [];
-      if (customList.length > 0) return customList;
-      return user ? [user] : FAMILY_PROFILES;
+      if (customList.length > 0) return customList.map(normalizeProfile);
+      return user ? [normalizeProfile(user)] : FAMILY_PROFILES.map(normalizeProfile);
     } catch (_) {
-      return FAMILY_PROFILES;
+      return FAMILY_PROFILES.map(normalizeProfile);
     }
   });
 
@@ -107,7 +137,8 @@ export default function App() {
   // Active Family Profile
   const [activeProfile, setActiveProfile] = useState(() => {
     const saved = localStorage.getItem('apnavaidya_active_profile_id');
-    return familyProfiles.find(p => p.id === saved) || familyProfiles[0] || FAMILY_PROFILES[0];
+    const matched = familyProfiles.find(p => p.id === saved) || familyProfiles[0] || FAMILY_PROFILES[0];
+    return normalizeProfile(matched);
   });
 
   // Global Language
@@ -140,34 +171,38 @@ export default function App() {
     } catch (_) {}
 
     if (isDemo) {
-      setFamilyProfiles(FAMILY_PROFILES);
-      setActiveProfile(profile || FAMILY_PROFILES[0]);
+      const normList = FAMILY_PROFILES.map(normalizeProfile);
+      setFamilyProfiles(normList);
+      const safeProf = normalizeProfile(profile || FAMILY_PROFILES[0]);
+      setActiveProfile(safeProf);
       try {
-        localStorage.setItem('apnavaidya_active_profile_id', (profile || FAMILY_PROFILES[0]).id);
+        localStorage.setItem('apnavaidya_active_profile_id', safeProf.id);
         localStorage.removeItem('apnavaidya_custom_profiles');
       } catch (_) {}
     } else {
-      const userProfiles = [profile];
+      const safeProf = normalizeProfile(profile || user);
+      const userProfiles = [safeProf];
       setFamilyProfiles(userProfiles);
       try {
         localStorage.setItem('apnavaidya_custom_profiles', JSON.stringify(userProfiles));
-        localStorage.setItem('apnavaidya_active_profile_id', profile.id);
+        localStorage.setItem('apnavaidya_active_profile_id', safeProf.id);
       } catch (_) {}
-      setActiveProfile(profile);
+      setActiveProfile(safeProf);
     }
   };
 
   const handleAddFamilyMember = (newMember) => {
+    const safeMember = normalizeProfile(newMember);
     setFamilyProfiles(prev => {
-      const updated = [...prev, newMember];
+      const updated = [...prev, safeMember];
       try {
         localStorage.setItem('apnavaidya_custom_profiles', JSON.stringify(updated));
       } catch (_) {}
       return updated;
     });
-    setActiveProfile(newMember);
+    setActiveProfile(safeMember);
     try {
-      localStorage.setItem('apnavaidya_active_profile_id', newMember.id);
+      localStorage.setItem('apnavaidya_active_profile_id', safeMember.id);
     } catch (_) {}
   };
 
@@ -294,23 +329,23 @@ export default function App() {
           {/* Top Quick Status Bar */}
           <div className="mb-5 p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-emerald-50/90 via-white to-rose-50/80 border border-[#E3ECE6] flex items-center justify-between flex-wrap gap-3 shadow-xs print:hidden">
             <div className="flex items-center gap-3">
-              <div className={`w-9 h-9 rounded-xl bg-gradient-to-tr ${activeProfile.avatarColor} text-white flex items-center justify-center font-extrabold text-xs shadow-xs`}>
-                {activeProfile.avatarInitials}
+              <div className={`w-9 h-9 rounded-xl bg-gradient-to-tr ${activeProfile?.avatarColor || 'from-brand-green-600 to-teal-700'} text-white flex items-center justify-center font-extrabold text-xs shadow-xs`}>
+                {activeProfile?.avatarInitials || 'AV'}
               </div>
               <div>
                 <div className="flex items-center gap-2">
                   <h1 className="text-sm sm:text-base font-extrabold text-slate-900 font-display">
-                    {activeProfile.name}
+                    {activeProfile?.name || 'Patient'}
                   </h1>
                   <span className="badge-green text-[10px] font-bold py-0.2">
-                    {activeProfile.relationship}
+                    {activeProfile?.relationship || 'Self'}
                   </span>
                   <span className="badge-pink text-[10px] py-0.2 hidden sm:inline-flex">
-                    {activeProfile.bloodGroup}
+                    {activeProfile?.bloodGroup || 'B+'}
                   </span>
                 </div>
                 <p className="text-xs text-slate-500 font-medium">
-                  {activeProfile.age} yrs • {activeProfile.gender} • {activeProfile.allergies.length > 0 ? `Allergies: ${activeProfile.allergies.join(', ')}` : 'No known allergies'}
+                  {activeProfile?.age || 30} yrs • {activeProfile?.gender || 'Male'} • {(activeProfile?.allergies || []).length > 0 ? `Allergies: ${activeProfile.allergies.join(', ')}` : 'No known allergies'}
                 </p>
               </div>
             </div>

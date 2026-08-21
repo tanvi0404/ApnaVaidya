@@ -10,8 +10,17 @@ import {
   AlertCircle
 } from 'lucide-react';
 
-export default function LifestyleCategoryCards({ activeProfile, onSelectTab }) {
-  const { lifestyle, dietPreference, conditions, goals } = activeProfile;
+export default function LifestyleCategoryCards({ activeProfile = {}, onSelectTab = () => {} }) {
+  const lifestyle = activeProfile?.lifestyle || {
+    nutrition: 'Good',
+    activity: 'Active (Walking & Cardio)',
+    sleep: '7.5 hrs (Restful)',
+    hydration: '2.5 L / 3.0 L'
+  };
+  const dietPreference = activeProfile?.dietPreference || 'Vegetarian';
+  const conditions = Array.isArray(activeProfile?.conditions) ? activeProfile.conditions : [];
+  const bmi = activeProfile?.bmi || 23.5;
+  const bloodGroup = activeProfile?.bloodGroup || 'B+';
 
   return (
     <div className="space-y-3">
@@ -126,7 +135,7 @@ export default function LifestyleCategoryCards({ activeProfile, onSelectTab }) {
           <div className="mt-3">
             <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">Vitals Baseline</div>
             <div className="text-base font-extrabold text-slate-900 mt-0.5 group-hover:text-emerald-800 transition-colors">
-              BMI: {activeProfile.bmi} • {activeProfile.bloodGroup}
+              BMI: {bmi} • {bloodGroup}
             </div>
             <p className="text-xs text-slate-500 mt-1 line-clamp-2">
               {conditions.length > 0 ? conditions.join(', ') : 'No chronic conditions recorded'}

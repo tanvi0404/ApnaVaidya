@@ -109,7 +109,7 @@ export default function EmergencyFirstAidView({ activeProfile, onOpenEmergency }
           <div className="p-3 bg-white/5 rounded-2xl border border-white/10">
             <span className="text-slate-400 block text-[10px] uppercase font-bold">Known Allergies</span>
             <strong className="text-rose-300 font-bold">
-              {activeProfile.allergies.join(', ') || 'No Known Drug Allergies'}
+              {(activeProfile?.allergies || []).join(', ') || 'No Known Drug Allergies'}
             </strong>
           </div>
 

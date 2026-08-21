@@ -121,7 +121,7 @@ export default function DoctorVisitSummary({ activeProfile, reports = [] }) {
 
           <div>
             <span className="text-[10px] text-slate-400 font-bold uppercase block">Known Allergies</span>
-            <span className="font-extrabold text-rose-700">{activeProfile.allergies.join(', ') || 'NKDA'}</span>
+            <span className="font-extrabold text-rose-700">{(activeProfile?.allergies || []).join(', ') || 'NKDA'}</span>
           </div>
         </div>
 
