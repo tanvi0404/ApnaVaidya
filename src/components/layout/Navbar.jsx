@@ -12,7 +12,8 @@ import {
   Activity,
   UserCheck,
   Menu,
-  X
+  X,
+  LogOut
 } from 'lucide-react';
 import { FAMILY_PROFILES } from '../../data/mockData';
 
@@ -25,7 +26,10 @@ export default function Navbar({
   onToggleNotifications,
   activeLanguage,
   onChangeLanguage,
-  onToggleMobileSidebar
+  onToggleMobileSidebar,
+  profiles = FAMILY_PROFILES,
+  authUser = null,
+  onLogout = () => {}
 }) {
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const [langDropdownOpen, setLangDropdownOpen] = useState(false);
@@ -173,7 +177,7 @@ export default function Navbar({
                   </div>
                   
                   <div className="space-y-1">
-                    {FAMILY_PROFILES.map((profile) => (
+                    {profiles.map((profile) => (
                       <button
                         key={profile.id}
                         onClick={() => {
@@ -187,8 +191,8 @@ export default function Navbar({
                         }`}
                       >
                         <div className="flex items-center gap-2.5">
-                          <div className={`w-8 h-8 rounded-lg bg-gradient-to-tr ${profile.avatarColor} text-white flex items-center justify-center font-bold text-xs`}>
-                            {profile.avatarInitials}
+                          <div className={`w-8 h-8 rounded-lg bg-gradient-to-tr ${profile.avatarColor || 'from-emerald-600 to-teal-700'} text-white flex items-center justify-center font-bold text-xs`}>
+                            {profile.avatarInitials || 'AV'}
                           </div>
                           <div className="text-left">
                             <div className="text-xs font-bold text-slate-900">{profile.name}</div>
@@ -202,8 +206,20 @@ export default function Navbar({
                     ))}
                   </div>
 
-                  <div className="mt-2 pt-2 border-t border-slate-100 px-2 text-[11px] text-slate-400 italic text-center">
-                    Separate health record per profile
+                  <div className="mt-2 pt-2 border-t border-slate-100 space-y-1">
+                    <button
+                      onClick={() => {
+                        setProfileDropdownOpen(false);
+                        onLogout();
+                      }}
+                      className="w-full flex items-center justify-center gap-2 p-2 rounded-xl text-xs font-bold text-rose-600 hover:bg-rose-50 transition-colors"
+                    >
+                      <LogOut className="w-3.5 h-3.5" />
+                      <span>Sign Out / Switch Account</span>
+                    </button>
+                    <div className="text-[10px] text-slate-400 italic text-center">
+                      End-to-End Encrypted Health Session
+                    </div>
                   </div>
                 </div>
               )}

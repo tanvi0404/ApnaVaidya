@@ -2,6 +2,7 @@ package com.apnavaidya;
 
 import com.apnavaidya.model.*;
 import com.apnavaidya.service.*;
+import com.apnavaidya.storage.*;
 import com.sun.net.httpserver.*;
 
 import java.io.*;
@@ -670,6 +671,107 @@ public class ApnaVaidyaServer {
                         res.getStiffnessLabel(),
                         res.getStiffnessColor(),
                         recs.toString()
+                    );
+                    sendResponse(exchange, 200, json);
+                } else {
+                    sendResponse(exchange, 405, "{\"error\":\"Method Not Allowed\"}");
+                }
+            });
+
+            // Auth Login Endpoint
+            server.createContext("/api/auth/login", exchange -> {
+                setCorsHeaders(exchange);
+                if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
+                    sendResponse(exchange, 204, "");
+                    return;
+                }
+
+                if ("POST".equalsIgnoreCase(exchange.getRequestMethod())) {
+                    String body = readBody(exchange);
+                    String identifier = extractJsonString(body, "identifier");
+                    String password = extractJsonString(body, "password");
+
+                    if (identifier == null || identifier.trim().isEmpty()) {
+                        sendResponse(exchange, 400, "{\"error\":\"Identifier is required\"}");
+                        return;
+                    }
+
+                    String name = identifier.contains("@") ? identifier.split("@")[0] : identifier;
+                    if (identifier.toLowerCase().contains("arjun")) name = "Arjun Sharma";
+                    else if (identifier.toLowerCase().contains("rajesh")) name = "Rajesh Sharma";
+                    else if (identifier.toLowerCase().contains("sunita")) name = "Sunita Sharma";
+                    else if (identifier.toLowerCase().contains("ananya")) name = "Ananya Sharma";
+
+                    String json = String.format(
+                        Locale.US,
+                        "{\"success\":true,\"token\":\"jwt_session_%d\",\"user\":{\"id\":\"user-%s\",\"name\":\"%s\",\"email\":\"%s\",\"mobile\":\"+91 98765 43210\"}}",
+                        System.currentTimeMillis(),
+                        escapeJson(identifier.replaceAll("[^a-zA-Z0-9]", "").toLowerCase()),
+                        escapeJson(name),
+                        escapeJson(identifier.contains("@") ? identifier : identifier + "@apnavaidya.in")
+                    );
+                    sendResponse(exchange, 200, json);
+                } else {
+                    sendResponse(exchange, 405, "{\"error\":\"Method Not Allowed\"}");
+                }
+            });
+
+            // Auth Register Endpoint
+            server.createContext("/api/auth/register", exchange -> {
+                setCorsHeaders(exchange);
+                if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
+                    sendResponse(exchange, 204, "");
+                    return;
+                }
+
+                if ("POST".equalsIgnoreCase(exchange.getRequestMethod())) {
+                    String body = readBody(exchange);
+                    String name = extractJsonString(body, "name");
+                    String email = extractJsonString(body, "email");
+                    String mobile = extractJsonString(body, "mobile");
+                    int age = extractJsonInt(body, "age", 30);
+                    String gender = extractJsonString(body, "gender");
+                    String place = extractJsonString(body, "place");
+                    String address = extractJsonString(body, "address");
+                    String bloodGroup = extractJsonString(body, "bloodGroup");
+                    String dietPreference = extractJsonString(body, "dietPreference");
+
+                    String userId = "user-reg-" + System.currentTimeMillis();
+
+                    // Persist to users database
+                    String existingUsers = DatabaseManager.getInstance().loadTableData("users");
+                    String userJson = String.format(
+                        Locale.US,
+                        "{\"id\":\"%s\",\"name\":\"%s\",\"email\":\"%s\",\"mobile\":\"%s\",\"age\":%d,\"gender\":\"%s\",\"place\":\"%s\",\"address\":\"%s\",\"bloodGroup\":\"%s\",\"dietPreference\":\"%s\"}",
+                        userId, escapeJson(name), escapeJson(email), escapeJson(mobile), age, escapeJson(gender),
+                        escapeJson(place), escapeJson(address), escapeJson(bloodGroup), escapeJson(dietPreference)
+                    );
+
+                    if (existingUsers == null || existingUsers.trim().isEmpty() || existingUsers.equals("[]")) {
+                        DatabaseManager.getInstance().saveTableData("users", "[" + userJson + "]");
+                    } else {
+                        String updated = existingUsers.trim();
+                        if (updated.endsWith("]")) {
+                            updated = updated.substring(0, updated.length() - 1).trim();
+                            if (updated.endsWith("[")) {
+                                updated = "[" + userJson + "]";
+                            } else {
+                                updated = updated + "," + userJson + "]";
+                            }
+                            DatabaseManager.getInstance().saveTableData("users", updated);
+                        }
+                    }
+
+                    // Audit Log
+                    com.apnavaidya.storage.DatabaseManager.getInstance().saveTableData("last_audit", 
+                        "{\"eventType\":\"USER_REGISTRATION\",\"actor\":\"" + escapeJson(name) + "\",\"timestamp\":\"" + java.time.Instant.now() + "\"}"
+                    );
+
+                    String json = String.format(
+                        Locale.US,
+                        "{\"success\":true,\"token\":\"jwt_session_%d\",\"user\":%s}",
+                        System.currentTimeMillis(),
+                        userJson
                     );
                     sendResponse(exchange, 200, json);
                 } else {

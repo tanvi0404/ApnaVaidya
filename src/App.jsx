@@ -70,6 +70,27 @@ function ViewLoadingSkeleton() {
 }
 
 export default function App() {
+  // Authentication State
+  const [authUser, setAuthUser] = useState(() => {
+    try {
+      const saved = localStorage.getItem('apnavaidya_auth_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch (_) {
+      return null;
+    }
+  });
+
+  // Dynamic Family Profiles (Preloaded + Registered Custom Profiles)
+  const [familyProfiles, setFamilyProfiles] = useState(() => {
+    try {
+      const custom = localStorage.getItem('apnavaidya_custom_profiles');
+      const customList = custom ? JSON.parse(custom) : [];
+      return [...customList, ...FAMILY_PROFILES];
+    } catch (_) {
+      return FAMILY_PROFILES;
+    }
+  });
+
   // Active Navigation Tab
   const [activeTab, setActiveTab] = useState(() => {
     return localStorage.getItem('apnavaidya_active_tab') || 'dashboard';
@@ -78,7 +99,7 @@ export default function App() {
   // Active Family Profile
   const [activeProfile, setActiveProfile] = useState(() => {
     const saved = localStorage.getItem('apnavaidya_active_profile_id');
-    return FAMILY_PROFILES.find(p => p.id === saved) || FAMILY_PROFILES[0];
+    return familyProfiles.find(p => p.id === saved) || familyProfiles[0] || FAMILY_PROFILES[0];
   });
 
   // Global Language
@@ -102,14 +123,46 @@ export default function App() {
   // Electronic Medical Reports List
   const [reportsList, setReportsList] = useState(PRELOADED_REPORTS);
 
+  const handleLogin = (user, profile) => {
+    setAuthUser(user);
+    try {
+      localStorage.setItem('apnavaidya_auth_user', JSON.stringify(user));
+    } catch (_) {}
+
+    if (profile) {
+      setFamilyProfiles(prev => {
+        const exists = prev.some(p => p.id === profile.id);
+        const updated = exists ? prev : [profile, ...prev];
+        try {
+          const customOnly = updated.filter(p => !FAMILY_PROFILES.some(fp => fp.id === p.id));
+          localStorage.setItem('apnavaidya_custom_profiles', JSON.stringify(customOnly));
+        } catch (_) {}
+        return updated;
+      });
+      setActiveProfile(profile);
+      try {
+        localStorage.setItem('apnavaidya_active_profile_id', profile.id);
+      } catch (_) {}
+    }
+  };
+
+  const handleLogout = () => {
+    try {
+      localStorage.removeItem('apnavaidya_auth_user');
+    } catch (_) {}
+    setAuthUser(null);
+  };
+
   // Sync state changes with localStorage
   useEffect(() => {
     localStorage.setItem('apnavaidya_active_tab', activeTab);
   }, [activeTab]);
 
   useEffect(() => {
-    localStorage.setItem('apnavaidya_active_profile_id', activeProfile.id);
-  }, [activeProfile.id]);
+    if (activeProfile?.id) {
+      localStorage.setItem('apnavaidya_active_profile_id', activeProfile.id);
+    }
+  }, [activeProfile?.id]);
 
   useEffect(() => {
     localStorage.setItem('apnavaidya_lang', activeLanguage);
@@ -118,16 +171,18 @@ export default function App() {
   // Sync Reports from Java 17 Backend
   useEffect(() => {
     let isMounted = true;
-    fetchReportsFromBackend(activeProfile.id).then(reports => {
-      if (isMounted && reports && reports.length > 0) {
-        setReportsList(reports);
-      }
-    }).catch(err => {
-      console.warn('Backend sync failed, using preloaded data:', err);
-    });
+    if (activeProfile?.id) {
+      fetchReportsFromBackend(activeProfile.id).then(reports => {
+        if (isMounted && reports && reports.length > 0) {
+          setReportsList(reports);
+        }
+      }).catch(err => {
+        console.warn('Backend sync:', err.message);
+      });
+    }
 
     return () => { isMounted = false; };
-  }, [activeProfile.id]);
+  }, [activeProfile?.id]);
 
   const unreadCount = notifications.filter(n => n.unread).length;
 
@@ -164,8 +219,13 @@ export default function App() {
   };
 
   // Filter reports relevant for active profile
-  const profileReports = reportsList.filter(r => r.profileId === activeProfile.id);
+  const profileReports = reportsList.filter(r => r && r.profileId === activeProfile?.id);
   const displayedReports = profileReports.length > 0 ? profileReports : reportsList;
+
+  // Unauthenticated gateway gate
+  if (!authUser) {
+    return <AuthModal onLogin={handleLogin} />;
+  }
 
   return (
     <div className="min-h-screen bg-[#FAFCFA] text-slate-900 flex flex-col font-sans selection:bg-brand-green-100 selection:text-brand-green-900">
@@ -181,6 +241,9 @@ export default function App() {
         activeLanguage={activeLanguage}
         onChangeLanguage={setActiveLanguage}
         onToggleMobileSidebar={() => setMobileSidebarOpen(!mobileSidebarOpen)}
+        profiles={familyProfiles}
+        authUser={authUser}
+        onLogout={handleLogout}
       />
 
       {/* Main Full-Width Layout */}
@@ -394,7 +457,7 @@ export default function App() {
               <WomensHealthView 
                 activeProfile={activeProfile} 
                 onSelectProfile={(profId) => {
-                  const target = FAMILY_PROFILES.find(p => p.id === profId);
+                  const target = familyProfiles.find(p => p.id === profId);
                   if (target) setActiveProfile(target);
                 }}
               />
