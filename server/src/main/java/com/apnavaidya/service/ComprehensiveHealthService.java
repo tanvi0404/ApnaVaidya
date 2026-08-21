@@ -122,25 +122,32 @@ public class ComprehensiveHealthService {
         return s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
     }
 
-    // 2. IDRS Diabetes Risk Score
+    // 2. IDRS Diabetes Risk Score (ICMR-INDIAB Validated, Max 100)
     public Map<String, Object> calculateIdrs(int age, int waistCm, String activity, String familyHistory) {
         int score = 0;
 
+        // Age: <35 (0), 35-49 (20), >=50 (30)
         if (age >= 50) score += 30;
         else if (age >= 35) score += 20;
         else score += 0;
 
-        if (waistCm >= 90) score += 30;
+        // Waist: <80cm (0), 80-89cm (10), >=90cm (20)
+        if (waistCm >= 90) score += 20;
         else if (waistCm >= 80) score += 10;
         else score += 0;
 
+        // Physical Activity: Vigorous (0), Moderate (10), Mild (20), Sedentary (30)
         if (activity != null && activity.toLowerCase().contains("sedentary")) score += 30;
+        else if (activity != null && activity.toLowerCase().contains("mild")) score += 20;
         else if (activity != null && activity.toLowerCase().contains("moderate")) score += 10;
         else score += 0;
 
+        // Family History: None (0), One Parent (10), Both Parents (20)
         if (familyHistory != null && familyHistory.toLowerCase().contains("both")) score += 20;
         else if (familyHistory != null && (familyHistory.toLowerCase().contains("one") || familyHistory.toLowerCase().contains("parent"))) score += 10;
         else score += 0;
+
+        score = Math.min(100, Math.max(0, score));
 
         String riskCategory = score >= 60 ? "HIGH RISK (Score >= 60)" : score >= 30 ? "MODERATE RISK (Score 30-50)" : "LOW RISK (Score < 30)";
         String advice = score >= 60 
@@ -148,7 +155,10 @@ public class ComprehensiveHealthService {
             : "Maintain regular physical activity and optimal waist circumference.";
 
         Map<String, Object> result = new HashMap<>();
+        result.put("score", score);
+        result.put("totalScore", score);
         result.put("idrsScore", score);
+        result.put("maxScore", 100);
         result.put("riskCategory", riskCategory);
         result.put("clinicalAdvice", advice);
         result.put("guidelineSource", "ICMR-INDIAB Diabetes Risk Score");

@@ -45,17 +45,21 @@ public class ApnaVaidyaTest {
             failed++;
         }
 
-        // Test 2: IDRS Indian Diabetes Risk Score
+        // Test 2: IDRS Indian Diabetes Risk Score (ICMR-INDIAB Standard, 0 - 100 points)
         try {
             ComprehensiveHealthService compService = new ComprehensiveHealthService();
-            Map<String, Object> idrs = compService.calculateIdrs(55, 95, "Sedentary / Desk Job", "Both Parents Diabetic");
+            Map<String, Object> idrsHigh = compService.calculateIdrs(55, 95, "Sedentary / Desk Job", "Both Parents Diabetic");
             
-            int score = (Integer) idrs.get("idrsScore");
-            String cat = (String) idrs.get("riskCategory");
-            assert score >= 60 : "High risk IDRS score expected for 55yo sedentary with diabetic parents";
-            assert cat != null && cat.contains("HIGH RISK") : "Expected HIGH RISK";
+            int scoreHigh = (Integer) idrsHigh.get("score");
+            String catHigh = (String) idrsHigh.get("riskCategory");
+            assert scoreHigh == 100 : "Max possible IDRS score must equal exactly 100 (got " + scoreHigh + ")";
+            assert catHigh != null && catHigh.contains("HIGH RISK") : "Expected HIGH RISK";
+
+            Map<String, Object> idrsMod = compService.calculateIdrs(38, 85, "Moderate Exercise / Regular Walking", "One Parent Diabetic");
+            int scoreMod = (Integer) idrsMod.get("score");
+            assert scoreMod == 50 : "Expected 50 for 38yo(20) + 85cm(10) + mod(10) + oneParent(10), got " + scoreMod;
             
-            System.out.printf("  ✓ [PASS] IDRS Diabetes Engine: Score %d/100 (%s)%n", score, cat);
+            System.out.printf("  ✓ [PASS] IDRS Diabetes Engine: Boundary 0-100 Validated (%d/100, %d/100)%n", scoreHigh, scoreMod);
             passed++;
         } catch (Throwable t) {
             System.err.println("  ✗ [FAIL] IDRS Diabetes Engine: " + t.getMessage());

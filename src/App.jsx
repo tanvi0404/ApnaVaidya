@@ -248,9 +248,8 @@ export default function App() {
             {activeTab === 'dashboard' && (
               <HealthDashboard
                 activeProfile={activeProfile}
-                onNavigateToReports={() => setActiveTab('reports')}
-                onNavigateToChat={() => setActiveTab('chat')}
-                onNavigateToMeds={() => setActiveTab('medications')}
+                reports={displayedReports}
+                onSelectTab={setActiveTab}
                 onOpenUpload={() => setReportUploadModalOpen(true)}
                 onOpenEmergency={() => setEmergencyModalOpen(true)}
               />

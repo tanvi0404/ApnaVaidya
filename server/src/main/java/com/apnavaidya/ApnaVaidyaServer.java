@@ -104,8 +104,9 @@ public class ApnaVaidyaServer {
 
                     Map<String, Object> result = comprehensiveService.calculateIdrs(age, waist, activity, familyHistory);
                     String json = String.format(
-                        "{\"idrsScore\":%d,\"riskCategory\":\"%s\",\"clinicalAdvice\":\"%s\",\"guidelineSource\":\"%s\"}",
-                        (Integer) result.get("idrsScore"), escapeJson((String) result.get("riskCategory")),
+                        "{\"idrsScore\":%d,\"score\":%d,\"totalScore\":%d,\"maxScore\":%d,\"riskCategory\":\"%s\",\"clinicalAdvice\":\"%s\",\"guidelineSource\":\"%s\"}",
+                        (Integer) result.get("idrsScore"), (Integer) result.get("score"), (Integer) result.get("totalScore"), (Integer) result.get("maxScore"),
+                        escapeJson((String) result.get("riskCategory")),
                         escapeJson((String) result.get("clinicalAdvice")), escapeJson((String) result.get("guidelineSource"))
                     );
                     sendResponse(exchange, 200, json);
