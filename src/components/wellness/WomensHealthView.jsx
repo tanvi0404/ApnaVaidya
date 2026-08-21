@@ -8,11 +8,12 @@ import {
   Droplet, 
   Activity, 
   CheckCircle2,
-  TrendingUp
+  TrendingUp,
+  UserCheck
 } from 'lucide-react';
 import { WOMENS_HEALTH_DATA } from '../../data/wellnessData';
 
-export default function WomensHealthView({ activeProfile }) {
+export default function WomensHealthView({ activeProfile, onSelectProfile = () => {} }) {
   const [data, setData] = useState(WOMENS_HEALTH_DATA);
   const [loggedSymptoms, setLoggedSymptoms] = useState(['Mild Cramps', 'Bloating']);
 
@@ -21,6 +22,40 @@ export default function WomensHealthView({ activeProfile }) {
       prev.includes(sym) ? prev.filter(s => s !== sym) : [...prev, sym]
     );
   };
+
+  // If user is viewing a Male profile, show helpful guidance and 1-click profile switch
+  if (activeProfile?.gender !== 'Female') {
+    return (
+      <div className="card-white p-8 text-center space-y-5 max-w-lg mx-auto my-12 border-rose-200 bg-rose-50/40 animate-fadeIn">
+        <div className="w-14 h-14 rounded-3xl bg-rose-100 text-rose-600 flex items-center justify-center mx-auto shadow-soft-pink">
+          <HeartHandshake className="w-7 h-7" />
+        </div>
+        
+        <div>
+          <span className="badge-pink text-[10px] font-bold uppercase tracking-wider">
+            Biological Gender Profile Notice
+          </span>
+          <h3 className="text-lg sm:text-xl font-extrabold text-slate-900 font-display mt-1">
+            Women's Health & Hormonal Rhythm
+          </h3>
+          <p className="text-xs text-slate-600 mt-2.5 leading-relaxed">
+            You are currently viewing the profile of <strong className="text-slate-900">{activeProfile?.name}</strong> ({activeProfile?.gender || 'Male'}).
+            This clinical module (menstrual tracking, ovulation forecasts, and estrogen/progesterone balance) is designed for female biological profiles in your family vault.
+          </p>
+        </div>
+
+        <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
+          <button
+            onClick={() => onSelectProfile('user-sunita')}
+            className="btn-primary-pink text-xs py-2 px-4 shadow-sm w-full sm:w-auto flex items-center justify-center gap-2"
+          >
+            <UserCheck className="w-4 h-4" />
+            <span>Switch to Sunita Sharma (Mother • 58y)</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fadeIn">
@@ -34,7 +69,7 @@ export default function WomensHealthView({ activeProfile }) {
                 <Heart className="w-3.5 h-3.5 fill-current" /> WOMEN'S HEALTH & HORMONAL WELLNESS
               </span>
               <span className="text-xs text-slate-400">•</span>
-              <span className="text-xs text-slate-500 font-semibold">{activeProfile.name}</span>
+              <span className="text-xs text-slate-500 font-semibold">{activeProfile.name} ({activeProfile.age}y)</span>
             </div>
             <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 font-display mt-1">
               Menstrual Cycle & Hormone Tracking
@@ -78,73 +113,82 @@ export default function WomensHealthView({ activeProfile }) {
           </h4>
 
           <div className="p-3.5 bg-rose-50/70 border border-rose-200 rounded-2xl">
-            <span className="text-[10px] text-rose-800 font-bold uppercase block">Predicted Fertile Window</span>
-            <div className="text-base font-extrabold text-rose-950 mt-0.5">{data.fertileWindow}</div>
-            <span className="text-[11px] text-rose-700 mt-0.5 block">Estimated Peak Ovulation: <strong>{data.ovulationDay}</strong></span>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-700">Estimated Ovulation</span>
+              <span className="badge-pink text-[10px] font-bold">Day 14</span>
+            </div>
+            <div className="text-base font-extrabold text-slate-900 mt-1">
+              {data.ovulationDate}
+            </div>
+            <p className="text-[11px] text-slate-500 mt-1">
+              Fertile Window: {data.fertileWindow}
+            </p>
           </div>
 
           <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs space-y-1">
-            <span className="font-bold text-slate-800 block">Cycle Metrics Baseline</span>
-            <div className="text-slate-600">Average Length: <strong>{data.cycleLength} Days</strong></div>
-            <div className="text-slate-600">Period Duration: <strong>{data.periodDuration} Days</strong></div>
+            <span className="font-bold text-slate-700 block">Typical Cycle Metrics:</span>
+            <div className="flex justify-between text-slate-500">
+              <span>Average Length:</span>
+              <strong className="text-slate-800">{data.cycleLengthDays} Days</strong>
+            </div>
+            <div className="flex justify-between text-slate-500">
+              <span>Period Duration:</span>
+              <strong className="text-slate-800">{data.periodDurationDays} Days</strong>
+            </div>
           </div>
         </div>
 
-        {/* Daily Symptom Logging */}
-        <div className="card-white p-6 space-y-3">
+        {/* Hormonal Nutrition & Energy */}
+        <div className="card-white p-6 space-y-4">
           <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-            <Sparkles className="w-3.5 h-3.5 text-teal-600" />
-            Daily PMS & Body Symptoms
+            <Sparkles className="w-3.5 h-3.5 text-brand-pink-500" />
+            Hormone-Sync Nutrition
           </h4>
 
-          <div className="grid grid-cols-2 gap-1.5">
-            {['Mild Cramps', 'Bloating', 'Headache', 'Backache', 'Mood Shift', 'Energetic', 'Fatigue', 'Acne'].map(sym => (
-              <button
-                key={sym}
-                onClick={() => toggleSymptom(sym)}
-                className={`p-2 rounded-xl text-xs font-bold transition-all text-center border ${
-                  loggedSymptoms.includes(sym)
-                    ? 'bg-rose-50 border-rose-300 text-rose-800 shadow-2xs'
-                    : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-                }`}
-              >
-                {loggedSymptoms.includes(sym) ? '✓ ' : ''}{sym}
-              </button>
-            ))}
-          </div>
+          <div className="space-y-3 text-xs">
+            <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl">
+              <span className="font-bold text-emerald-900 block mb-0.5">Recommended Foods:</span>
+              <p className="text-emerald-800 font-medium">
+                {data.recommendedFoods.join(' • ')}
+              </p>
+            </div>
 
-          <p className="text-[11px] text-slate-400 pt-1 text-center">
-            {loggedSymptoms.length} symptoms logged for today.
-          </p>
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl">
+              <span className="font-bold text-amber-900 block mb-0.5">Hydration & Electrolytes:</span>
+              <p className="text-amber-800 font-medium">
+                Increase magnesium-rich foods (pumpkin seeds, spinach) and drink warm ginger-cumin water.
+              </p>
+            </div>
+          </div>
         </div>
 
       </div>
 
-      {/* Hormone Panel Correlation (Clinical Intersect) */}
+      {/* Symptom Logger */}
       <div className="card-white p-6 space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="font-extrabold text-slate-900 text-base font-display">
-              Endocrine & Hormone Biomarker Correlation
-            </h3>
-            <p className="text-xs text-slate-500">
-              Integrates lab report findings (Thyroid, Prolactin, Androgen ratio) with cycle health.
-            </p>
-          </div>
-          <span className="badge-green text-xs">All Normal</span>
-        </div>
+        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+          <Activity className="w-3.5 h-3.5 text-brand-pink-500" />
+          Log Daily Hormonal & Premenstrual Symptoms
+        </h4>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
-          {data.hormonePanels.map((panel, idx) => (
-            <div key={idx} className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="font-bold text-slate-900 text-xs">{panel.name}</span>
-                <span className="badge-green text-[10px]">{panel.status}</span>
-              </div>
-              <div className="text-base font-extrabold text-slate-900">{panel.value}</div>
-              <p className="text-[11px] text-slate-500 pt-0.5">{panel.notes}</p>
-            </div>
-          ))}
+        <div className="flex flex-wrap gap-2.5">
+          {data.commonSymptoms.map((sym) => {
+            const isLogged = loggedSymptoms.includes(sym);
+            return (
+              <button
+                key={sym}
+                onClick={() => toggleSymptom(sym)}
+                className={`px-3.5 py-2 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 ${
+                  isLogged
+                    ? 'bg-rose-500 text-white shadow-soft-pink'
+                    : 'bg-slate-100 text-slate-600 hover:bg-rose-50 hover:text-rose-700'
+                }`}
+              >
+                {isLogged ? <CheckCircle2 className="w-4 h-4" /> : <Droplet className="w-3.5 h-3.5" />}
+                <span>{sym}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
 

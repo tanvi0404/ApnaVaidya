@@ -79,7 +79,9 @@ export default function Sidebar({
     { id: 'vault', label: 'Health Vault & Records', icon: FolderLock, badge: null, color: 'green' },
     { id: 'feed', label: 'Doctor-Reviewed Feed', icon: BookOpen, badge: null, color: 'green' },
     { id: 'symptoms', label: 'Symptom Checker', icon: Activity, badge: 'Triage', color: 'pink' },
-    { id: 'womens_health', label: "Women's Health", icon: HeartHandshake, badge: 'Hormones', color: 'pink' },
+    ...(activeProfile?.gender === 'Female' ? [
+      { id: 'womens_health', label: "Women's Health", icon: HeartHandshake, badge: 'Hormones', color: 'pink' }
+    ] : []),
     { id: 'wellness', label: 'Sleep & Daily Habits', icon: Moon, badge: null, color: 'green' },
     { id: 'security', label: 'Security & Audit Vault', icon: ShieldCheck, badge: 'HIPAA/GDPR', color: 'green' }
   ];

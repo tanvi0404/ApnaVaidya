@@ -391,7 +391,13 @@ export default function App() {
             )}
 
             {activeTab === 'womens_health' && (
-              <WomensHealthView activeProfile={activeProfile} />
+              <WomensHealthView 
+                activeProfile={activeProfile} 
+                onSelectProfile={(profId) => {
+                  const target = PROFILES.find(p => p.id === profId);
+                  if (target) setActiveProfile(target);
+                }}
+              />
             )}
 
             {activeTab === 'wellness' && (
