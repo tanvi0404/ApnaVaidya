@@ -394,7 +394,7 @@ export default function App() {
               <WomensHealthView 
                 activeProfile={activeProfile} 
                 onSelectProfile={(profId) => {
-                  const target = PROFILES.find(p => p.id === profId);
+                  const target = FAMILY_PROFILES.find(p => p.id === profId);
                   if (target) setActiveProfile(target);
                 }}
               />
