@@ -5,6 +5,7 @@ import EmergencyModal from './components/layout/EmergencyModal';
 import NotificationDrawer from './components/layout/NotificationDrawer';
 import ReportUploadModal from './components/reports/ReportUploadModal';
 import FullHealthDossierModal from './components/dossier/FullHealthDossierModal';
+import AuthModal from './components/auth/AuthModal';
 
 // Code-split view components for optimal sub-150KB bundle performance
 const HealthDashboard = lazy(() => import('./components/dashboard/HealthDashboard'));
