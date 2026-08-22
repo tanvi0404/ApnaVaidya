@@ -84,9 +84,9 @@ export default function FullHealthDossierModal({ isOpen, onClose, activeProfile,
           {/* Cover Header */}
           <div className="flex items-start justify-between border-b-2 border-slate-900 pb-6">
             <div>
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-extrabold text-sm">
-                  AV
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-white border border-slate-200 p-0.5 overflow-hidden flex items-center justify-center">
+                  <img src="/logo.png" alt="ApnaVaidya Logo" className="w-full h-full object-contain" />
                 </div>
                 <h1 className="text-xl sm:text-2xl font-black tracking-tight font-display text-slate-900">
                   Apna<span className="text-emerald-600">Vaidya</span> Comprehensive Health Dossier

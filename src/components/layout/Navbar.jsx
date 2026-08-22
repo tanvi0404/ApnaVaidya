@@ -76,11 +76,8 @@ export default function Navbar({
               <Menu className="w-5 h-5" />
             </button>
 
-            <div className="relative flex items-center justify-center w-10 h-10 rounded-2xl bg-gradient-to-br from-brand-green-500 to-brand-green-700 text-white shadow-soft-green flex-shrink-0">
-              <Activity className="w-5 h-5 text-white" />
-              <div className="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full bg-brand-pink-500 border-2 border-white flex items-center justify-center">
-                <Heart className="w-2 h-2 text-white fill-current" />
-              </div>
+            <div className="relative flex items-center justify-center w-10 h-10 rounded-2xl bg-white border border-emerald-100 shadow-soft-green p-0.5 flex-shrink-0 overflow-hidden">
+              <img src="/logo.png" alt="ApnaVaidya Logo" className="w-full h-full object-contain" />
             </div>
             
             <div>

@@ -260,12 +260,9 @@ export default function AuthModal({ onLogin }) {
           <Sparkles className="w-3.5 h-3.5 text-brand-pink-400" />
         </div>
 
-        <div className="flex items-center justify-center gap-2.5">
-          <div className="relative flex items-center justify-center w-12 h-12 rounded-2xl bg-gradient-to-br from-brand-green-500 to-brand-green-600 text-white shadow-soft-green">
-            <Activity className="w-6 h-6 text-white" />
-            <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-brand-pink-500 border-2 border-white flex items-center justify-center">
-              <Heart className="w-2.5 h-2.5 text-white fill-current" />
-            </div>
+        <div className="flex items-center justify-center gap-3">
+          <div className="relative flex items-center justify-center w-14 h-14 rounded-2xl bg-white p-1 shadow-xl border border-white/30 overflow-hidden">
+            <img src="/logo.png" alt="ApnaVaidya Logo" className="w-full h-full object-contain" />
           </div>
           <h1 className="text-3xl sm:text-4xl font-extrabold text-white font-display tracking-tight">
             Apna<span className="text-emerald-400">Vaidya</span>
