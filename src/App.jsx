@@ -163,8 +163,20 @@ export default function App() {
   // Persistent Notification list
   const [notifications, setNotifications] = useState(INITIAL_NOTIFICATIONS);
 
-  // Electronic Medical Reports List
-  const [reportsList, setReportsList] = useState(PRELOADED_REPORTS);
+  // Electronic Medical Reports List (Preloaded for Demo, Clean Slate for Real Accounts)
+  const [reportsList, setReportsList] = useState(() => {
+    try {
+      const savedUser = localStorage.getItem('apnavaidya_auth_user');
+      const user = savedUser ? JSON.parse(savedUser) : null;
+      if (!user || user.isDemo) {
+        return PRELOADED_REPORTS;
+      }
+      const savedReports = localStorage.getItem(`apnavaidya_reports_${user.id}`) || localStorage.getItem('apnavaidya_reports_all');
+      return savedReports ? JSON.parse(savedReports) : [];
+    } catch (_) {
+      return PRELOADED_REPORTS;
+    }
+  });
 
   const handleLogin = (user, profile, isDemo = false) => {
     const sessionUser = { ...user, isDemo };
@@ -178,6 +190,7 @@ export default function App() {
       setFamilyProfiles(normList);
       const safeProf = normalizeProfile(profile || FAMILY_PROFILES[0]);
       setActiveProfile(safeProf);
+      setReportsList(PRELOADED_REPORTS);
       try {
         localStorage.setItem('apnavaidya_active_profile_id', safeProf.id);
         localStorage.removeItem('apnavaidya_custom_profiles');
@@ -191,6 +204,10 @@ export default function App() {
         localStorage.setItem('apnavaidya_active_profile_id', safeProf.id);
       } catch (_) {}
       setActiveProfile(safeProf);
+      // Clean slate or fetch real patient reports
+      fetchReportsFromBackend(safeProf.id).then(reps => {
+        setReportsList(Array.isArray(reps) ? reps : []);
+      });
     }
   };
 

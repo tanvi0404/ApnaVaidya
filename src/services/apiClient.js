@@ -69,7 +69,16 @@ export async function checkBackendHealth() {
 }
 
 export async function fetchReportsFromBackend(profileId = null) {
-  // Check LocalStorage cache first
+  const isDemoSession = (() => {
+    try {
+      const saved = localStorage.getItem('apnavaidya_auth_user');
+      const u = saved ? JSON.parse(saved) : null;
+      return !u || u.isDemo === true;
+    } catch (_) {
+      return true;
+    }
+  })();
+
   const cacheKey = profileId ? `apnavaidya_reports_${profileId}` : 'apnavaidya_reports_all';
   let cachedReports = null;
   try {
@@ -84,8 +93,12 @@ export async function fetchReportsFromBackend(profileId = null) {
     if (!res.ok) throw new Error(`HTTP error ${res.status}`);
     const rawReports = await res.json();
 
-    if (!Array.isArray(rawReports) || rawReports.length === 0) {
-      return cachedReports || PRELOADED_REPORTS;
+    if (!Array.isArray(rawReports)) {
+      return isDemoSession ? (cachedReports || PRELOADED_REPORTS) : (cachedReports || []);
+    }
+
+    if (rawReports.length === 0) {
+      return isDemoSession ? (cachedReports || PRELOADED_REPORTS) : [];
     }
 
     // Normalize reports to guarantee full UI schema compatibility
@@ -147,7 +160,7 @@ export async function fetchReportsFromBackend(profileId = null) {
     return normalized;
   } catch (err) {
     console.warn('Fallback to cached/preloaded reports:', err.message);
-    return cachedReports || PRELOADED_REPORTS;
+    return isDemoSession ? (cachedReports || PRELOADED_REPORTS) : (cachedReports || []);
   }
 }
 
