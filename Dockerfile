@@ -15,6 +15,7 @@ RUN mkdir -p server/target/classes && \
     javac --release 17 -d server/target/classes \
     server/src/main/java/com/apnavaidya/model/*.java \
     server/src/main/java/com/apnavaidya/storage/*.java \
+    server/src/main/java/com/apnavaidya/storage/repository/*.java \
     server/src/main/java/com/apnavaidya/service/*.java \
     server/src/main/java/com/apnavaidya/ApnaVaidyaServer.java
 
