@@ -1,0 +1,126 @@
+package com.apnavaidya.storage.repository;
+
+import com.apnavaidya.model.MedicationItem;
+import com.apnavaidya.storage.DatabaseManager;
+import com.apnavaidya.storage.JsonUtil;
+
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+
+/**
+ * Phase 4: Thread-Safe Relational Repository for Prescription Medications
+ */
+public class MedicationRepository {
+
+    private final DatabaseManager db;
+    private final Map<String, MedicationItem> memoryIndex = new ConcurrentHashMap<>();
+
+    public MedicationRepository() {
+        this.db = DatabaseManager.getInstance();
+        loadAll();
+    }
+
+    private synchronized void loadAll() {
+        String json = db.loadTableData("medications");
+        if (json != null && !json.trim().isEmpty()) {
+            List<String> objects = JsonUtil.extractJsonObjects(json);
+            for (String obj : objects) {
+                String id = JsonUtil.extractString(obj, "id");
+                if (id == null || id.isEmpty()) {
+                    id = "med-" + System.currentTimeMillis() + "-" + (int)(Math.random() * 1000);
+                }
+                MedicationItem item = new MedicationItem(
+                    id,
+                    JsonUtil.extractString(obj, "profileId", "user-arjun"),
+                    JsonUtil.extractString(obj, "name"),
+                    JsonUtil.extractString(obj, "genericName"),
+                    JsonUtil.extractString(obj, "dosage"),
+                    JsonUtil.extractString(obj, "frequency"),
+                    JsonUtil.extractString(obj, "timing"),
+                    JsonUtil.extractString(obj, "foodInstruction"),
+                    JsonUtil.extractString(obj, "prescribedFor"),
+                    JsonUtil.extractString(obj, "doctorName"),
+                    JsonUtil.extractInt(obj, "remainingDays", 30),
+                    JsonUtil.extractInt(obj, "totalPills", 60),
+                    JsonUtil.extractInt(obj, "remainingPills", 45),
+                    JsonUtil.extractBoolean(obj, "takenToday", false)
+                );
+                memoryIndex.put(item.getId(), item);
+            }
+        }
+    }
+
+    public List<MedicationItem> findAll() {
+        return new ArrayList<>(memoryIndex.values());
+    }
+
+    public List<MedicationItem> findByProfileId(String profileId) {
+        List<MedicationItem> results = new ArrayList<>();
+        for (MedicationItem m : memoryIndex.values()) {
+            if (profileId != null && profileId.equalsIgnoreCase(m.getProfileId())) {
+                results.add(m);
+            }
+        }
+        return results;
+    }
+
+    public Optional<MedicationItem> findById(String id) {
+        return Optional.ofNullable(memoryIndex.get(id));
+    }
+
+    public synchronized MedicationItem save(MedicationItem item) {
+        if (item.getId() == null || item.getId().isEmpty()) {
+            item.setId("med-" + System.currentTimeMillis() + "-" + (int)(Math.random() * 1000));
+        }
+        memoryIndex.put(item.getId(), item);
+        flushToDisk();
+        return item;
+    }
+
+    public synchronized boolean toggleTakenToday(String id) {
+        MedicationItem m = memoryIndex.get(id);
+        if (m != null) {
+            m.setTakenToday(!m.isTakenToday());
+            flushToDisk();
+            return true;
+        }
+        return false;
+    }
+
+    public synchronized boolean deleteById(String id) {
+        MedicationItem removed = memoryIndex.remove(id);
+        if (removed != null) {
+            flushToDisk();
+            return true;
+        }
+        return false;
+    }
+
+    private void flushToDisk() {
+        StringBuilder sb = new StringBuilder("[");
+        List<MedicationItem> list = new ArrayList<>(memoryIndex.values());
+        for (int i = 0; i < list.size(); i++) {
+            MedicationItem m = list.get(i);
+            sb.append(String.format(
+                "{\"id\":\"%s\",\"profileId\":\"%s\",\"name\":\"%s\",\"genericName\":\"%s\",\"dosage\":\"%s\",\"frequency\":\"%s\",\"timing\":\"%s\",\"foodInstruction\":\"%s\",\"prescribedFor\":\"%s\",\"doctorName\":\"%s\",\"remainingDays\":%d,\"totalPills\":%d,\"remainingPills\":%d,\"takenToday\":%b}",
+                JsonUtil.escapeJson(m.getId()),
+                JsonUtil.escapeJson(m.getProfileId() != null ? m.getProfileId() : "user-arjun"),
+                JsonUtil.escapeJson(m.getName()),
+                JsonUtil.escapeJson(m.getGenericName()),
+                JsonUtil.escapeJson(m.getDosage()),
+                JsonUtil.escapeJson(m.getFrequency()),
+                JsonUtil.escapeJson(m.getTiming()),
+                JsonUtil.escapeJson(m.getFoodInstruction()),
+                JsonUtil.escapeJson(m.getPrescribedFor()),
+                JsonUtil.escapeJson(m.getDoctorName()),
+                m.getRemainingDays(),
+                m.getTotalPills(),
+                m.getRemainingPills(),
+                m.isTakenToday()
+            ));
+            if (i < list.size() - 1) sb.append(",");
+        }
+        sb.append("]");
+        db.saveTableData("medications", sb.toString());
+    }
+}

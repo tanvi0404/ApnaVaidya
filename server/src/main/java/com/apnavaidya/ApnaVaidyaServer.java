@@ -29,6 +29,9 @@ public class ApnaVaidyaServer {
 
     public static void main(String[] args) {
         try {
+            // Phase 4: Run Database Schema Migrations
+            com.apnavaidya.storage.SchemaMigrator.runMigrations(System.getenv("DATABASE_URL"));
+
             int port = PORT;
             HttpServer server;
             try {

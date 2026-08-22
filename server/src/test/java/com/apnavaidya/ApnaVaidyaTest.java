@@ -375,6 +375,31 @@ public class ApnaVaidyaTest {
             failed++;
         }
 
+        // Test 16: Phase 4 Relational Schema Migrations & Repository Layer
+        try {
+            List<String> scripts = com.apnavaidya.storage.SchemaMigrator.getMigrationScripts();
+            assert scripts.size() == 6 : "Must have 6 defined DDL migration scripts";
+            assert scripts.get(0).contains("CREATE TABLE IF NOT EXISTS users") : "Must include users table DDL";
+            assert scripts.get(2).contains("CREATE TABLE IF NOT EXISTS medical_reports") : "Must include medical_reports table DDL";
+
+            com.apnavaidya.storage.repository.MedicalReportRepository repRepo = new com.apnavaidya.storage.repository.MedicalReportRepository();
+            com.apnavaidya.model.MedicalReport testRep = new com.apnavaidya.model.MedicalReport(
+                "rep-pg-test-01", "user-arjun", "PostgreSQL/SQLite DDL Test Report", "AIIMS Lab",
+                "22 Aug 2026", "General", "99.9%", "DDL schema persistence operational.", Collections.emptyList()
+            );
+            repRepo.save(testRep);
+            Optional<com.apnavaidya.model.MedicalReport> fetched = repRepo.findById("rep-pg-test-01");
+            assert fetched.isPresent() : "Saved report must be queryable by ID";
+            assert "PostgreSQL/SQLite DDL Test Report".equals(fetched.get().getTitle()) : "Title must match";
+            repRepo.deleteById("rep-pg-test-01");
+
+            System.out.printf("  ✓ [PASS] Schema Migrations & Relational Repository Engine: Verified 6 DDL Schemas%n");
+            passed++;
+        } catch (Throwable t) {
+            System.err.println("  ✗ [FAIL] Schema Migrations & Relational Repository Engine: " + t.getMessage());
+            failed++;
+        }
+
         System.out.println("==================================================");
         System.out.printf("🏁 Test Results: %d Passed, %d Failed%n", passed, failed);
         System.out.println("==================================================");
