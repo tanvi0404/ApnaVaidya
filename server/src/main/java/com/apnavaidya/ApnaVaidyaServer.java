@@ -51,11 +51,16 @@ public class ApnaVaidyaServer {
                 sendResponse(exchange, 200, json);
             });
 
-            // Security Audit Vault Endpoint
+            // Security Audit Vault Endpoint (Protected)
             server.createContext("/api/security/audit-logs", exchange -> {
                 setCorsHeaders(exchange);
                 if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
                     sendResponse(exchange, 204, "");
+                    return;
+                }
+
+                if (!isAuthorized(exchange)) {
+                    sendResponse(exchange, 401, "{\"error\":\"Unauthorized: Valid HMAC-SHA256 JWT Bearer token required\"}");
                     return;
                 }
 
@@ -116,11 +121,16 @@ public class ApnaVaidyaServer {
                 }
             });
 
-            // Digital Prescription Signing Endpoint
+            // Digital Prescription Signing Endpoint (Protected)
             server.createContext("/api/teleconsult/sign-prescription", exchange -> {
                 setCorsHeaders(exchange);
                 if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
                     sendResponse(exchange, 204, "");
+                    return;
+                }
+
+                if (!isAuthorized(exchange)) {
+                    sendResponse(exchange, 401, "{\"error\":\"Unauthorized: Valid HMAC-SHA256 JWT Bearer token required\"}");
                     return;
                 }
 
@@ -450,13 +460,18 @@ public class ApnaVaidyaServer {
                 }
             });
 
-            // Medications Endpoint
+            // Medications Endpoint (Protected)
             server.createContext("/api/medications", exchange -> {
                 setCorsHeaders(exchange);
                 String method = exchange.getRequestMethod();
 
                 if ("OPTIONS".equalsIgnoreCase(method)) {
                     sendResponse(exchange, 204, "");
+                    return;
+                }
+
+                if (!isAuthorized(exchange)) {
+                    sendResponse(exchange, 401, "{\"error\":\"Unauthorized: Valid HMAC-SHA256 JWT Bearer token required\"}");
                     return;
                 }
 
@@ -550,13 +565,18 @@ public class ApnaVaidyaServer {
                 }
             });
 
-            // Reports Endpoint
+            // Reports Endpoint (Protected)
             server.createContext("/api/reports", exchange -> {
                 setCorsHeaders(exchange);
                 String method = exchange.getRequestMethod();
 
                 if ("OPTIONS".equalsIgnoreCase(method)) {
                     sendResponse(exchange, 204, "");
+                    return;
+                }
+
+                if (!isAuthorized(exchange)) {
+                    sendResponse(exchange, 401, "{\"error\":\"Unauthorized: Valid HMAC-SHA256 JWT Bearer token required\"}");
                     return;
                 }
 
@@ -704,8 +724,13 @@ public class ApnaVaidyaServer {
                     String lowerId = identifier.trim().toLowerCase();
 
                     // Check for Evaluator / Demo Profiles
-                    boolean isDemo = lowerId.contains("arjun") || lowerId.contains("rajesh") || lowerId.contains("sunita") || lowerId.contains("ananya") || lowerId.contains("demo");
+                    boolean isDemo = lowerId.equals("arjun") || lowerId.equals("rajesh") || lowerId.equals("sunita") || lowerId.equals("ananya") || lowerId.equals("demo") || lowerId.endsWith("@apnavaidya.in") || lowerId.equals("demo@apnavaidya.in");
                     if (isDemo) {
+                        if (!AuthSecurityService.isDemoPasswordValid(password)) {
+                            sendResponse(exchange, 401, "{\"error\":\"Invalid credentials. For demo accounts, use password 'Demo@123'.\"}");
+                            return;
+                        }
+
                         String name = "Arjun Sharma";
                         String email = "arjun.sharma@apnavaidya.in";
                         String userId = "user-arjun";
@@ -894,11 +919,21 @@ public class ApnaVaidyaServer {
         }
     }
 
+    private static boolean isAuthorized(HttpExchange exchange) {
+        String authHeader = exchange.getRequestHeaders().getFirst("Authorization");
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return false;
+        }
+        String token = authHeader.substring(7).trim();
+        Map<String, String> claims = AuthSecurityService.verifyJwtToken(token);
+        return claims != null && claims.containsKey("sub");
+    }
+
     private static void setCorsHeaders(HttpExchange exchange) {
         Headers headers = exchange.getResponseHeaders();
         headers.set("Access-Control-Allow-Origin", "*");
         headers.set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-        headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization, Accept");
+        headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization, Accept, X-Requested-With");
         headers.set("Content-Type", "application/json; charset=UTF-8");
     }
 

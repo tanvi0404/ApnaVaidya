@@ -185,10 +185,10 @@ export default function ReportUploadModal({
                   <UploadCloud className="w-7 h-7" />
                 </div>
                 <h4 className="text-sm font-bold text-slate-900 group-hover:text-brand-green-800">
-                  Click to select or drag & drop your lab report
+                  Click to select or upload diagnostic report (TXT, CSV, JSON)
                 </h4>
                 <p className="text-xs text-slate-500 mt-1">
-                  Supports PDF, JPG, PNG, TXT, CSV Diagnostic Reports (Up to 25 MB)
+                  Extracts live clinical biomarkers directly into structured EHR parameters (or test with 1-click verified presets below)
                 </p>
                 <div className="mt-3 flex items-center justify-center gap-2 text-[11px] text-slate-400">
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />

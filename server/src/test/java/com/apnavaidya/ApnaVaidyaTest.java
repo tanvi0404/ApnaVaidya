@@ -235,6 +235,23 @@ public class ApnaVaidyaTest {
             failed++;
         }
 
+        // Test 10: Demo Password Validation & JWT Secret Externalization
+        try {
+            assert AuthSecurityService.isDemoPasswordValid("Demo@123") : "Demo@123 must be recognized as a valid demo password";
+            assert AuthSecurityService.isDemoPasswordValid("demo123") : "demo123 must be recognized";
+            assert !AuthSecurityService.isDemoPasswordValid("RandomPass") : "Arbitrary passwords must NOT bypass demo login";
+            assert !AuthSecurityService.isDemoPasswordValid("") : "Empty password must NOT bypass demo login";
+
+            String secret = AuthSecurityService.getJwtSecret();
+            assert secret != null && !secret.isEmpty() : "JWT secret must be loaded";
+
+            System.out.printf("  ✓ [PASS] Demo Auth Lockdown & Secret Externalization: Verified%n");
+            passed++;
+        } catch (Throwable t) {
+            System.err.println("  ✗ [FAIL] Demo Auth Lockdown & Secret Externalization: " + t.getMessage());
+            failed++;
+        }
+
         System.out.println("==================================================");
         System.out.printf("🏁 Test Results: %d Passed, %d Failed%n", passed, failed);
         System.out.println("==================================================");

@@ -34,6 +34,24 @@ async function getBaseUrl() {
   return activeBaseUrl || DEFAULT_PORT_1;
 }
 
+// Get Auth Headers with Bearer Token from LocalStorage
+export function getAuthHeaders() {
+  const headers = {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json'
+  };
+  try {
+    const rawAuth = localStorage.getItem('apnavaidya_auth_user');
+    if (rawAuth) {
+      const parsed = JSON.parse(rawAuth);
+      if (parsed?.token) {
+        headers['Authorization'] = `Bearer ${parsed.token}`;
+      }
+    }
+  } catch (_) {}
+  return headers;
+}
+
 export async function checkBackendHealth() {
   try {
     const url = await getBaseUrl();
@@ -62,7 +80,7 @@ export async function fetchReportsFromBackend(profileId = null) {
   try {
     const urlBase = await getBaseUrl();
     const url = profileId ? `${urlBase}/reports?profileId=${profileId}` : `${urlBase}/reports`;
-    const res = await fetch(url);
+    const res = await fetch(url, { headers: getAuthHeaders() });
     if (!res.ok) throw new Error(`HTTP error ${res.status}`);
     const rawReports = await res.json();
 
@@ -214,7 +232,7 @@ export async function fetchMedicationsFromBackend(profileId = 'user-arjun') {
 
   try {
     const urlBase = await getBaseUrl();
-    const res = await fetch(`${urlBase}/medications?profileId=${profileId}`);
+    const res = await fetch(`${urlBase}/medications?profileId=${profileId}`, { headers: getAuthHeaders() });
     if (!res.ok) throw new Error(`HTTP error ${res.status}`);
     const data = await res.json();
     try { localStorage.setItem(cacheKey, JSON.stringify(data)); } catch (_) {}
@@ -230,7 +248,7 @@ export async function toggleMedicationBackend(medId) {
     const urlBase = await getBaseUrl();
     const res = await fetch(`${urlBase}/medications`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ medId })
     });
     if (!res.ok) throw new Error(`HTTP error ${res.status}`);
@@ -246,7 +264,7 @@ export async function checkDrugInteractionsBackend(drugs) {
     const urlBase = await getBaseUrl();
     const res = await fetch(`${urlBase}/medications/interaction`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ drugs })
     });
     if (!res.ok) throw new Error(`HTTP error ${res.status}`);
@@ -262,7 +280,7 @@ export async function calculateLongevityBackend(longevityParams) {
     const urlBase = await getBaseUrl();
     const res = await fetch(`${urlBase}/longevity/score`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(longevityParams)
     });
     if (!res.ok) throw new Error(`HTTP error ${res.status}`);
@@ -276,7 +294,7 @@ export async function calculateLongevityBackend(longevityParams) {
 export async function fetchAuditLogsFromBackend() {
   try {
     const urlBase = await getBaseUrl();
-    const res = await fetch(`${urlBase}/security/audit-logs`);
+    const res = await fetch(`${urlBase}/security/audit-logs`, { headers: getAuthHeaders() });
     if (!res.ok) throw new Error(`HTTP error ${res.status}`);
     const rawLogs = await res.json();
     if (!Array.isArray(rawLogs)) return null;
@@ -302,7 +320,7 @@ export async function logAuditEventBackend(eventType, details) {
     const urlBase = await getBaseUrl();
     const res = await fetch(`${urlBase}/security/audit-logs`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ eventType, details })
     });
     if (!res.ok) throw new Error(`HTTP error ${res.status}`);
@@ -318,7 +336,7 @@ export async function signPrescriptionBackend(rxParams) {
     const urlBase = await getBaseUrl();
     const res = await fetch(`${urlBase}/teleconsult/sign-prescription`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(rxParams)
     });
     if (!res.ok) throw new Error(`HTTP error ${res.status}`);

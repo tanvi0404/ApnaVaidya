@@ -236,89 +236,28 @@ export function analyzeUploadedFile(fileOrPresetName, activeProfileId, rawTextCo
     };
   }
 
-  // Fallback comprehensive multi-panel extraction
+  // Truthful response when document has no recognizable lab biomarker entities
   return {
     id: `rep-${Date.now()}`,
     profileId: activeProfileId,
-    title: name || 'Custom Diagnostic Panel',
-    category: 'General Pathology',
-    labName: 'Accredited Diagnostics Lab',
+    title: name || 'Uploaded Health Document',
+    category: 'Diagnostic Investigation',
+    labName: 'Custom Upload / Scanned Document',
     testDate: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
     uploadDate: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
-    status: 'Analyzed',
-    badgeCount: '1 Elevated',
+    status: 'Needs Review',
+    badgeCount: 'Review Required',
     summary: {
-      overallStatus: 'Report Analyzed Successfully',
+      overallStatus: 'No Structured Biomarkers Detected in Text Layer',
       keyFindings: [
-        'All primary biomarkers successfully identified and parsed into structured clinical format.',
-        '1 parameter indicates mild elevation relative to baseline.',
-        'Electrolytes, fasting glucose, and metabolic markers within safe parameters.'
+        `Ingested document '${name}'.`,
+        'No standard biochemical reference markers (e.g. HbA1c, LDL, FBG, TSH, Creatinine) were detected in the text layer.',
+        'To test full diagnostic analysis, upload a text/CSV report containing lab values or select one of the preloaded clinical panels.'
       ],
-      aiRecommendation: 'Stay well hydrated (2.5L/day), limit refined sugar intake, and share this summary with your doctor.',
-      normalCount: 3,
-      abnormalCount: 1
+      aiRecommendation: 'Please ensure your uploaded report includes standard test names and numerical values, or test with our preloaded lab panels.',
+      normalCount: 0,
+      abnormalCount: 0
     },
-    parameters: [
-      {
-        id: `param-${Date.now()}-1`,
-        name: 'Serum Uric Acid',
-        category: 'Metabolic',
-        value: 7.6,
-        unit: 'mg/dL',
-        minNormal: 3.5,
-        maxNormal: 7.2,
-        status: 'HIGH',
-        clinicalMeaning: 'Waste product formed from breakdown of purines in food and cells.',
-        plainExplanation: 'Your uric acid is slightly elevated at 7.6 mg/dL. Proper hydration helps kidneys flush excess uric acid.',
-        lifestyleTip: 'Drink 2.5-3 liters of water daily. Limit purine-dense foods and sugary beverages.',
-        doctorQuestion: 'Do I need any purine restriction or follow-up kidney evaluation?',
-        sourceCitation: 'American College of Rheumatology & ICMR Protocols'
-      },
-      {
-        id: `param-${Date.now()}-2`,
-        name: 'Fasting Blood Glucose',
-        category: 'Glycemic',
-        value: 92,
-        unit: 'mg/dL',
-        minNormal: 70,
-        maxNormal: 99,
-        status: 'NORMAL',
-        clinicalMeaning: 'Glucose level in bloodstream after overnight fasting.',
-        plainExplanation: 'Fasting blood sugar is in an optimal, healthy range (92 mg/dL).',
-        lifestyleTip: 'Maintain balanced fiber and protein intake at breakfast.',
-        doctorQuestion: 'Optimal glycemic reading confirmed.',
-        sourceCitation: 'ADA Guidelines'
-      },
-      {
-        id: `param-${Date.now()}-3`,
-        name: 'Serum Electrolytes (Sodium)',
-        category: 'Electrolytes',
-        value: 140,
-        unit: 'mEq/L',
-        minNormal: 135,
-        maxNormal: 145,
-        status: 'NORMAL',
-        clinicalMeaning: 'Major extracellular electrolyte regulating fluid balance.',
-        plainExplanation: 'Sodium levels are perfectly balanced at 140 mEq/L.',
-        lifestyleTip: 'Continue healthy sodium intake.',
-        doctorQuestion: 'Optimal electrolyte balance.',
-        sourceCitation: 'Harrison\'s Principles of Internal Medicine'
-      },
-      {
-        id: `param-${Date.now()}-4`,
-        name: 'Total Cholesterol',
-        category: 'Lipid Profile',
-        value: 178,
-        unit: 'mg/dL',
-        minNormal: 125,
-        maxNormal: 200,
-        status: 'NORMAL',
-        clinicalMeaning: 'Total blood cholesterol level.',
-        plainExplanation: 'Total cholesterol is within normal target (<200 mg/dL).',
-        lifestyleTip: 'Maintain intake of heart-healthy unsaturated oils and nuts.',
-        doctorQuestion: 'Lipid parameters stable.',
-        sourceCitation: 'NLA Clinical Guidelines'
-      }
-    ]
+    parameters: []
   };
 }
