@@ -202,7 +202,7 @@ export default function ReportUploadModal({
                   Click to select or drag & drop diagnostic lab document
                 </h4>
                 <p className="text-xs text-slate-500 mt-1">
-                  Supports Multi-Page PDF, Scanned Images (PNG, JPG), TXT, and CSV Reports (Up to 25 MB)
+                  Supports Digital PDF (.pdf), Scanned Receipts (.png, .jpg, .jpeg, .webp), and Lab Data (.txt, .csv) up to 25 MB
                 </p>
                 <div className="mt-3 flex items-center justify-center gap-2 text-[11px] text-slate-400">
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />

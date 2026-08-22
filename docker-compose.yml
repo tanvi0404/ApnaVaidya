@@ -13,6 +13,7 @@ services:
       - NODE_ENV=production
       - PORT=3000
       - JWT_SECRET=ApnaVaidya_2026_Enterprise_Production_Secret_Key_98234!
+      - VAULT_ENCRYPTION_KEY=ApnaVaidya_2026_Enterprise_AES256_Vault_Key_Production_98234!
       - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173
     volumes:
       - apnavaidya_data:/app/server/data

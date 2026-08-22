@@ -66,13 +66,9 @@ public class ChikitsakAiService {
                     String line;
                     while ((line = br.readLine()) != null) resp.append(line);
                     String raw = resp.toString();
-                    int textIndex = raw.indexOf("\"text\": \"");
-                    if (textIndex != -1) {
-                        int start = textIndex + 9;
-                        int end = raw.indexOf("\"", start);
-                        if (end != -1) {
-                            return unescapeJson(raw.substring(start, end));
-                        }
+                    String parsedText = extractJsonStringByKey(raw, "text");
+                    if (parsedText != null && !parsedText.trim().isEmpty()) {
+                        return parsedText;
                     }
                 }
             }
@@ -111,13 +107,9 @@ public class ChikitsakAiService {
                     String line;
                     while ((line = br.readLine()) != null) resp.append(line);
                     String raw = resp.toString();
-                    int contentIdx = raw.indexOf("\"content\": \"");
-                    if (contentIdx != -1) {
-                        int start = contentIdx + 12;
-                        int end = raw.indexOf("\"", start);
-                        if (end != -1) {
-                            return unescapeJson(raw.substring(start, end));
-                        }
+                    String parsedContent = extractJsonStringByKey(raw, "content");
+                    if (parsedContent != null && !parsedContent.trim().isEmpty()) {
+                        return parsedContent;
                     }
                 }
             }
@@ -156,13 +148,9 @@ public class ChikitsakAiService {
                     String line;
                     while ((line = br.readLine()) != null) resp.append(line);
                     String raw = resp.toString();
-                    int respIdx = raw.indexOf("\"response\": \"");
-                    if (respIdx != -1) {
-                        int start = respIdx + 13;
-                        int end = raw.indexOf("\"", start);
-                        if (end != -1) {
-                            return unescapeJson(raw.substring(start, end));
-                        }
+                    String parsedResp = extractJsonStringByKey(raw, "response");
+                    if (parsedResp != null && !parsedResp.trim().isEmpty()) {
+                        return parsedResp;
                     }
                 }
             }
@@ -414,8 +402,43 @@ public class ChikitsakAiService {
         return raw.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "");
     }
 
-    private static String unescapeJson(String raw) {
-        if (raw == null) return "";
-        return raw.replace("\\n", "\n").replace("\\\"", "\"").replace("\\\\", "\\");
+    public static String extractJsonStringByKey(String json, String targetKey) {
+        if (json == null || targetKey == null) return null;
+        String patternKey = "\"" + targetKey + "\"";
+        int idx = json.indexOf(patternKey);
+        while (idx != -1) {
+            int colonIdx = json.indexOf(":", idx + patternKey.length());
+            if (colonIdx != -1) {
+                int start = colonIdx + 1;
+                while (start < json.length() && Character.isWhitespace(json.charAt(start))) {
+                    start++;
+                }
+                if (start < json.length() && json.charAt(start) == '"') {
+                    start++;
+                    StringBuilder sb = new StringBuilder();
+                    boolean escape = false;
+                    for (int i = start; i < json.length(); i++) {
+                        char c = json.charAt(i);
+                        if (escape) {
+                            if (c == '"') sb.append('"');
+                            else if (c == '\\') sb.append('\\');
+                            else if (c == 'n') sb.append('\n');
+                            else if (c == 'r') sb.append('\r');
+                            else if (c == 't') sb.append('\t');
+                            else sb.append(c);
+                            escape = false;
+                        } else if (c == '\\') {
+                            escape = true;
+                        } else if (c == '"') {
+                            return sb.toString();
+                        } else {
+                            sb.append(c);
+                        }
+                    }
+                }
+            }
+            idx = json.indexOf(patternKey, idx + patternKey.length());
+        }
+        return null;
     }
 }

@@ -2,32 +2,29 @@ package com.apnavaidya.service;
 
 import com.apnavaidya.model.LabParameter;
 import com.apnavaidya.model.MedicalReport;
-import com.apnavaidya.storage.DatabaseManager;
-import com.apnavaidya.storage.JsonUtil;
+import com.apnavaidya.storage.repository.MedicalReportRepository;
 
 import java.util.*;
 
+/**
+ * ApnaVaidya Diagnostic Lab Report Service
+ * Fully backed by the Phase 4 MedicalReportRepository
+ */
 public class ReportService {
 
-    private final List<MedicalReport> reports = new ArrayList<>();
-    private final DatabaseManager db = DatabaseManager.getInstance();
+    private final MedicalReportRepository reportRepo = new MedicalReportRepository();
 
     public ReportService() {
-        loadOrInitReports();
+        initIfEmpty();
     }
 
-    private void loadOrInitReports() {
-        String json = db.loadTableData("reports");
-        if (json != null && !json.trim().isEmpty() && !json.trim().equals("[]")) {
-            parseReportsJson(json);
-        } else {
+    private void initIfEmpty() {
+        if (reportRepo.findAll().isEmpty()) {
             initPreloadedReports();
-            saveReports();
         }
     }
 
     private void initPreloadedReports() {
-        reports.clear();
         // 1. Comprehensive Lipid Profile
         List<LabParameter> lipidParams = Arrays.asList(
             new LabParameter("param-ldl", "LDL Cholesterol (Direct)", 146.0, "mg/dL", 0, 100.0, "HIGH", 
@@ -40,7 +37,7 @@ public class ReportService {
                 "Total circulating sterol molecules in blood.", "ESC 2024 Guidelines")
         );
 
-        reports.add(new MedicalReport(
+        reportRepo.save(new MedicalReport(
             "rep-lipid-01",
             "user-arjun",
             "Comprehensive Fasting Lipid Profile",
@@ -62,7 +59,7 @@ public class ReportService {
                 "Basal pancreatic beta-cell insulin secretion.", "Endocrine Society")
         );
 
-        reports.add(new MedicalReport(
+        reportRepo.save(new MedicalReport(
             "rep-diab-02",
             "user-rajesh",
             "Diabetic Glycemic & HbA1c Panel",
@@ -84,7 +81,7 @@ public class ReportService {
                 "Active metabolic cellular thyroid hormone.", "ATA Guidelines")
         );
 
-        reports.add(new MedicalReport(
+        reportRepo.save(new MedicalReport(
             "rep-thyroid-03",
             "user-sunita",
             "Comprehensive Thyroid Function Test (TFT)",
@@ -97,112 +94,16 @@ public class ReportService {
         ));
     }
 
-    public synchronized List<MedicalReport> getAllReports() {
-        return new ArrayList<>(reports);
+    public List<MedicalReport> getAllReports() {
+        return reportRepo.findAll();
     }
 
-    public synchronized List<MedicalReport> getReportsByProfile(String profileId) {
-        List<MedicalReport> result = new ArrayList<>();
-        for (MedicalReport r : reports) {
-            if (profileId == null || profileId.equalsIgnoreCase(r.getProfileId())) {
-                result.add(r);
-            }
-        }
-        return result.isEmpty() ? reports : result;
+    public List<MedicalReport> getReportsByProfile(String profileId) {
+        List<MedicalReport> res = reportRepo.findByProfileId(profileId);
+        return res.isEmpty() ? reportRepo.findAll() : res;
     }
 
-    public synchronized MedicalReport addReport(MedicalReport newReport) {
-        if (newReport.getId() == null || newReport.getId().isEmpty()) {
-            newReport.setId("rep-" + System.currentTimeMillis());
-        }
-        reports.add(0, newReport);
-        saveReports();
-        return newReport;
-    }
-
-    private synchronized void saveReports() {
-        StringBuilder sb = new StringBuilder("[");
-        for (int i = 0; i < reports.size(); i++) {
-            MedicalReport r = reports.get(i);
-            sb.append("{")
-              .append("\"id\":\"").append(JsonUtil.escapeJson(r.getId())).append("\",")
-              .append("\"profileId\":\"").append(JsonUtil.escapeJson(r.getProfileId())).append("\",")
-              .append("\"title\":\"").append(JsonUtil.escapeJson(r.getTitle())).append("\",")
-              .append("\"labName\":\"").append(JsonUtil.escapeJson(r.getLabName())).append("\",")
-              .append("\"testDate\":\"").append(JsonUtil.escapeJson(r.getTestDate())).append("\",")
-              .append("\"category\":\"").append(JsonUtil.escapeJson(r.getCategory())).append("\",")
-              .append("\"ocrConfidence\":\"").append(JsonUtil.escapeJson(r.getOcrConfidence())).append("\",")
-              .append("\"overallSummary\":\"").append(JsonUtil.escapeJson(r.getOverallSummary())).append("\",")
-              .append("\"parameters\":[");
-            List<LabParameter> params = r.getParameters();
-            if (params != null) {
-                for (int j = 0; j < params.size(); j++) {
-                    LabParameter p = params.get(j);
-                    sb.append("{")
-                      .append("\"id\":\"").append(JsonUtil.escapeJson(p.getId())).append("\",")
-                      .append("\"name\":\"").append(JsonUtil.escapeJson(p.getName())).append("\",")
-                      .append("\"value\":").append(p.getValue()).append(",")
-                      .append("\"unit\":\"").append(JsonUtil.escapeJson(p.getUnit())).append("\",")
-                      .append("\"minNormal\":").append(p.getMinNormal()).append(",")
-                      .append("\"maxNormal\":").append(p.getMaxNormal()).append(",")
-                      .append("\"status\":\"").append(JsonUtil.escapeJson(p.getStatus())).append("\",")
-                      .append("\"plainDescription\":\"").append(JsonUtil.escapeJson(p.getPlainDescription())).append("\",")
-                      .append("\"clinicalCitation\":\"").append(JsonUtil.escapeJson(p.getClinicalCitation())).append("\"")
-                      .append("}");
-                    if (j < params.size() - 1) sb.append(",");
-                }
-            }
-            sb.append("]}");
-            if (i < reports.size() - 1) sb.append(",");
-        }
-        sb.append("]");
-        db.saveTableData("reports", sb.toString());
-    }
-
-    private void parseReportsJson(String json) {
-        try {
-            List<String> items = JsonUtil.extractJsonObjects(json);
-            if (items.isEmpty()) {
-                initPreloadedReports();
-                return;
-            }
-            reports.clear();
-            for (String block : items) {
-                String id = JsonUtil.extractString(block, "id");
-                if (id.isEmpty()) continue;
-                String profileId = JsonUtil.extractString(block, "profileId", "user-arjun");
-                String title = JsonUtil.extractString(block, "title");
-                String labName = JsonUtil.extractString(block, "labName");
-                String testDate = JsonUtil.extractString(block, "testDate");
-                String category = JsonUtil.extractString(block, "category");
-                String ocrConf = JsonUtil.extractString(block, "ocrConfidence");
-                String summary = JsonUtil.extractString(block, "overallSummary");
-
-                List<LabParameter> params = new ArrayList<>();
-                int paramStart = block.indexOf("\"parameters\":");
-                if (paramStart != -1) {
-                    String paramPart = block.substring(paramStart);
-                    List<String> pItems = JsonUtil.extractJsonObjects(paramPart);
-                    for (String pBlock : pItems) {
-                        String pId = JsonUtil.extractString(pBlock, "id");
-                        String pName = JsonUtil.extractString(pBlock, "name");
-                        double pVal = JsonUtil.extractDouble(pBlock, "value");
-                        String pUnit = JsonUtil.extractString(pBlock, "unit");
-                        double pMin = JsonUtil.extractDouble(pBlock, "minNormal");
-                        double pMax = JsonUtil.extractDouble(pBlock, "maxNormal");
-                        String pStatus = JsonUtil.extractString(pBlock, "status");
-                        String pDesc = JsonUtil.extractString(pBlock, "plainDescription");
-                        String pCite = JsonUtil.extractString(pBlock, "clinicalCitation");
-                        params.add(new LabParameter(pId, pName, pVal, pUnit, pMin, pMax, pStatus, pDesc, pCite));
-                    }
-                }
-                reports.add(new MedicalReport(id, profileId, title, labName, testDate, category, ocrConf, summary, params));
-            }
-            if (reports.isEmpty()) {
-                initPreloadedReports();
-            }
-        } catch (Exception e) {
-            initPreloadedReports();
-        }
+    public MedicalReport addReport(MedicalReport newReport) {
+        return reportRepo.save(newReport);
     }
 }

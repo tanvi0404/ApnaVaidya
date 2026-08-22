@@ -17,13 +17,13 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  * Features:
  * 1. Atomic file transactions with POSIX/NTFS atomic rename
  * 2. High-concurrency ReentrantReadWriteLock table locking
- * 3. AES-256 GCM authenticated encryption at rest for sensitive health records
+ * 3. AES-256 GCM authenticated encryption at rest for sensitive health records and PII
  * 4. Verifiable SHA-256 append-only immutable audit trail
+ * 5. Externalized VAULT_ENCRYPTION_KEY environment configuration
  */
 public class DatabaseManager {
 
     private static final String DATA_DIR = "server/data";
-    private static final byte[] ENCRYPTION_KEY_BYTES = "ApnaVaidya2026AES256HealthVaultK".getBytes(StandardCharsets.UTF_8);
     private static final int GCM_TAG_LENGTH = 128;
     private static final int GCM_IV_LENGTH = 12;
 
@@ -47,6 +47,22 @@ public class DatabaseManager {
             instance = new DatabaseManager();
         }
         return instance;
+    }
+
+    /**
+     * Externalized 256-bit AES Vault Key derived via SHA-256
+     */
+    private static byte[] getEncryptionKeyBytes() {
+        String envKey = System.getenv("VAULT_ENCRYPTION_KEY");
+        String secret = (envKey != null && !envKey.trim().isEmpty()) 
+            ? envKey.trim() 
+            : "ApnaVaidya_2026_Enterprise_AES256_Vault_Key_Production_98234!";
+        try {
+            MessageDigest sha = MessageDigest.getInstance("SHA-256");
+            return sha.digest(secret.getBytes(StandardCharsets.UTF_8));
+        } catch (Exception e) {
+            return "ApnaVaidya2026AES256HealthVaultK".getBytes(StandardCharsets.UTF_8);
+        }
     }
 
     private ReentrantReadWriteLock getLock(String tableName) {
@@ -96,16 +112,17 @@ public class DatabaseManager {
     }
 
     /**
-     * AES-256 GCM Field Encryption for sensitive patient biometrics & PII
+     * AES-256 GCM Field Encryption for sensitive patient biometrics, passwords, & PII
      */
     public static String encryptField(String plainText) {
         if (plainText == null || plainText.isEmpty()) return plainText;
+        if (plainText.startsWith("enc_aes256:")) return plainText; // already encrypted
         try {
             byte[] iv = new byte[GCM_IV_LENGTH];
             new SecureRandom().nextBytes(iv);
 
             Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
-            SecretKeySpec keySpec = new SecretKeySpec(ENCRYPTION_KEY_BYTES, "AES");
+            SecretKeySpec keySpec = new SecretKeySpec(getEncryptionKeyBytes(), "AES");
             GCMParameterSpec gcmSpec = new GCMParameterSpec(GCM_TAG_LENGTH, iv);
             cipher.init(Cipher.ENCRYPT_MODE, keySpec, gcmSpec);
 
@@ -138,12 +155,12 @@ public class DatabaseManager {
             System.arraycopy(combined, GCM_IV_LENGTH, cipherText, 0, cipherLength);
 
             Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
-            SecretKeySpec keySpec = new SecretKeySpec(ENCRYPTION_KEY_BYTES, "AES");
+            SecretKeySpec keySpec = new SecretKeySpec(getEncryptionKeyBytes(), "AES");
             GCMParameterSpec gcmSpec = new GCMParameterSpec(GCM_TAG_LENGTH, iv);
             cipher.init(Cipher.DECRYPT_MODE, keySpec, gcmSpec);
 
-            byte[] decrypted = cipher.doFinal(cipherText);
-            return new String(decrypted, StandardCharsets.UTF_8);
+            byte[] plainBytes = cipher.doFinal(cipherText);
+            return new String(plainBytes, StandardCharsets.UTF_8);
         } catch (Exception e) {
             System.err.println("Decryption error: " + e.getMessage());
             return cipherString;

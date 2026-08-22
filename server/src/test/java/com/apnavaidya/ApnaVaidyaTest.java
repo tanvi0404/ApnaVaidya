@@ -393,7 +393,32 @@ public class ApnaVaidyaTest {
             assert "PostgreSQL/SQLite DDL Test Report".equals(fetched.get().getTitle()) : "Title must match";
             repRepo.deleteById("rep-pg-test-01");
 
-            System.out.printf("  ✓ [PASS] Schema Migrations & Relational Repository Engine: Verified 6 DDL Schemas%n");
+            // Assert UserRepository with AES-256 GCM encrypted fields at rest
+            com.apnavaidya.storage.repository.UserRepository userRepo = new com.apnavaidya.storage.repository.UserRepository();
+            String testSalt = com.apnavaidya.service.AuthSecurityService.generateSalt();
+            String testHash = com.apnavaidya.service.AuthSecurityService.hashPassword("Secret123!", testSalt);
+            com.apnavaidya.storage.repository.UserRepository.UserEntity testUser = new com.apnavaidya.storage.repository.UserRepository.UserEntity(
+                "user-vault-test", "Vault User", "vault.test@apnavaidya.in", "+91 99999 88888",
+                testHash, testSalt, 45, "Female", "Delhi", "123 Ring Road, South Ext", "O+", "Vegetarian", "2026-08-22T00:00:00Z"
+            );
+            userRepo.save(testUser);
+
+            // Verify raw table data on disk contains enc_aes256: for sensitive fields
+            String rawUsersOnDisk = com.apnavaidya.storage.DatabaseManager.getInstance().loadTableData("users");
+            assert rawUsersOnDisk.contains("enc_aes256:") : "Raw data on disk must store AES-256 GCM encrypted cipherstrings";
+
+            // Verify transparent decryption through UserRepository
+            Optional<com.apnavaidya.storage.repository.UserRepository.UserEntity> optFetchedUser = userRepo.findByEmailOrMobile("vault.test@apnavaidya.in");
+            assert optFetchedUser.isPresent() : "User must be found by email";
+            assert testHash.equals(optFetchedUser.get().getPasswordHash()) : "Transparently decrypted hash must match original";
+            assert "O+".equals(optFetchedUser.get().getBloodGroup()) : "Decrypted blood group must match";
+
+            // Test hardened JSON parser in ChikitsakAiService
+            String sampleGeminiJson = "{\n  \"candidates\": [\n    {\n      \"content\": {\n        \"parts\": [\n          {\n            \"text\": \"Line 1\\nLine 2 with \\\"escaped\\\" text\"\n          }\n        ]\n      }\n    }\n  ]\n}";
+            String parsedText = com.apnavaidya.service.ChikitsakAiService.extractJsonStringByKey(sampleGeminiJson, "text");
+            assert parsedText != null && parsedText.contains("escaped") : "Hardened JSON extractor must extract text correctly";
+
+            System.out.printf("  ✓ [PASS] Schema Migrations & Relational Repository Engine: Verified 6 DDL Schemas, AES-256 Vault & Hardened JSON Parser%n");
             passed++;
         } catch (Throwable t) {
             System.err.println("  ✗ [FAIL] Schema Migrations & Relational Repository Engine: " + t.getMessage());

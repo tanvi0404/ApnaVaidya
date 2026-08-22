@@ -26,6 +26,7 @@ public class ApnaVaidyaServer {
     private static final LongevityService longevityService = new LongevityService();
     private static final ComprehensiveHealthService comprehensiveService = new ComprehensiveHealthService();
     private static final SimulationService simulationService = new SimulationService();
+    private static final com.apnavaidya.storage.repository.UserRepository userRepository = new com.apnavaidya.storage.repository.UserRepository();
 
     public static void main(String[] args) {
         try {
@@ -842,57 +843,40 @@ public class ApnaVaidyaServer {
                         return;
                     }
 
-                    // Search Database for Registered User
-                    String usersTable = DatabaseManager.getInstance().loadTableData("users");
-                    boolean userFound = false;
-                    String matchedUserJson = null;
+                    // Search Database via Phase 4/6 UserRepository (with AES-256 GCM encrypted fields at rest)
+                    Optional<com.apnavaidya.storage.repository.UserRepository.UserEntity> optUser = userRepository.findByEmailOrMobile(identifier);
 
-                    if (usersTable != null && usersTable.startsWith("[") && usersTable.endsWith("]")) {
-                        String inner = usersTable.substring(1, usersTable.length() - 1).trim();
-                        if (!inner.isEmpty()) {
-                            String[] userObjects = inner.split("(?<=\\}),\\s*(?=\\{)");
-                            for (String u : userObjects) {
-                                String email = extractJsonString(u, "email");
-                                String mobile = extractJsonString(u, "mobile");
-                                String cleanMobile = mobile.replaceAll("[^0-9]", "");
-                                String cleanInput = identifier.replaceAll("[^0-9]", "");
-
-                                if (email.equalsIgnoreCase(identifier) || (!cleanInput.isEmpty() && cleanMobile.endsWith(cleanInput))) {
-                                    userFound = true;
-                                    String salt = extractJsonString(u, "salt");
-                                    String hash = extractJsonString(u, "passwordHash");
-
-                                    // Verify salted password hash
-                                    if (salt.isEmpty() || hash.isEmpty() || !AuthSecurityService.verifyPassword(password, salt, hash)) {
-                                        sendResponse(exchange, 401, "{\"error\":\"Invalid credentials. Incorrect password.\"}");
-                                        return;
-                                    }
-
-                                    matchedUserJson = u;
-                                    break;
-                                }
-                            }
-                        }
-                    }
-
-                    if (!userFound || matchedUserJson == null) {
+                    if (optUser.isEmpty()) {
                         sendResponse(exchange, 401, "{\"error\":\"Account not found with this email/mobile. Please register first.\"}");
                         return;
                     }
 
-                    String userId = extractJsonString(matchedUserJson, "id");
-                    String name = extractJsonString(matchedUserJson, "name");
-                    String email = extractJsonString(matchedUserJson, "email");
+                    com.apnavaidya.storage.repository.UserRepository.UserEntity u = optUser.get();
+                    String salt = u.getSalt();
+                    String hash = u.getPasswordHash();
+
+                    // Verify salted password hash
+                    if (salt == null || hash == null || !AuthSecurityService.verifyPassword(password, salt, hash)) {
+                        sendResponse(exchange, 401, "{\"error\":\"Invalid credentials. Incorrect password.\"}");
+                        return;
+                    }
+
+                    String userId = u.getId();
+                    String name = u.getName();
+                    String email = u.getEmail();
                     String token = AuthSecurityService.createJwtToken(userId, email, name);
 
-                    // Strip passwordHash and salt before returning user
-                    String sanitizedUser = matchedUserJson.replaceAll(",\"passwordHash\":\"[^\"]*\"", "")
-                                                         .replaceAll(",\"salt\":\"[^\"]*\"", "");
+                    String userJson = String.format(
+                        Locale.US,
+                        "{\"id\":\"%s\",\"name\":\"%s\",\"email\":\"%s\",\"mobile\":\"%s\",\"age\":%d,\"gender\":\"%s\",\"place\":\"%s\",\"bloodGroup\":\"%s\",\"dietPreference\":\"%s\"}",
+                        u.getId(), escapeJson(u.getName()), escapeJson(u.getEmail()), escapeJson(u.getMobile()),
+                        u.getAge(), escapeJson(u.getGender()), escapeJson(u.getPlace()), escapeJson(u.getBloodGroup()), escapeJson(u.getDietPreference())
+                    );
 
                     String responseJson = String.format(
                         Locale.US,
                         "{\"success\":true,\"token\":\"%s\",\"user\":%s}",
-                        token, sanitizedUser
+                        token, userJson
                     );
                     sendResponse(exchange, 200, responseJson);
                 } else {
@@ -900,7 +884,7 @@ public class ApnaVaidyaServer {
                 }
             });
 
-            // Auth Register Endpoint with Salted PBKDF2 Password Hashing & Signed JWTs
+            // Auth Register Endpoint with Salted Password Hashing, AES-256 Vault & Signed JWTs
             server.createContext("/api/auth/register", exchange -> {
                 setCorsHeaders(exchange);
                 if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
@@ -937,34 +921,11 @@ public class ApnaVaidyaServer {
 
                     String userId = "user-reg-" + System.currentTimeMillis();
 
-                    // Persist to users database with salted hash
-                    String existingUsers = DatabaseManager.getInstance().loadTableData("users");
-                    String userJsonWithAuth = String.format(
-                        Locale.US,
-                        "{\"id\":\"%s\",\"name\":\"%s\",\"email\":\"%s\",\"mobile\":\"%s\",\"passwordHash\":\"%s\",\"salt\":\"%s\",\"age\":%d,\"gender\":\"%s\",\"place\":\"%s\",\"address\":\"%s\",\"bloodGroup\":\"%s\",\"dietPreference\":\"%s\",\"createdAt\":\"%s\"}",
-                        userId, escapeJson(name), escapeJson(email), escapeJson(mobile), passwordHash, salt, age, escapeJson(gender),
-                        escapeJson(place), escapeJson(address), escapeJson(bloodGroup), escapeJson(dietPreference), java.time.Instant.now().toString()
+                    // Persist via UserRepository (transparently encrypts passwordHash, salt, bloodGroup with AES-256 GCM)
+                    com.apnavaidya.storage.repository.UserRepository.UserEntity newUser = new com.apnavaidya.storage.repository.UserRepository.UserEntity(
+                        userId, name, email, mobile, passwordHash, salt, age, gender, place, address, bloodGroup, dietPreference, java.time.Instant.now().toString()
                     );
-
-                    if (existingUsers == null || existingUsers.trim().isEmpty() || existingUsers.equals("[]")) {
-                        DatabaseManager.getInstance().saveTableData("users", "[" + userJsonWithAuth + "]");
-                    } else {
-                        String updated = existingUsers.trim();
-                        if (updated.endsWith("]")) {
-                            updated = updated.substring(0, updated.length() - 1).trim();
-                            if (updated.endsWith("[")) {
-                                updated = "[" + userJsonWithAuth + "]";
-                            } else {
-                                updated = updated + "," + userJsonWithAuth + "]";
-                            }
-                            DatabaseManager.getInstance().saveTableData("users", updated);
-                        }
-                    }
-
-                    // Audit Log Registration Event
-                    com.apnavaidya.storage.DatabaseManager.getInstance().saveTableData("last_audit", 
-                        "{\"eventType\":\"USER_REGISTRATION\",\"actor\":\"" + escapeJson(name) + "\",\"timestamp\":\"" + java.time.Instant.now() + "\"}"
-                    );
+                    userRepository.save(newUser);
 
                     // Issue Cryptographic HMAC-SHA256 JWT Token
                     String token = AuthSecurityService.createJwtToken(userId, email, name);
