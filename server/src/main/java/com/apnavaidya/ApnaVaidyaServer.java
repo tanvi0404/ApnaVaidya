@@ -93,11 +93,16 @@ public class ApnaVaidyaServer {
                 }
             });
 
-            // IDRS Diabetes Risk Endpoint
+            // IDRS Diabetes Risk Endpoint (Protected)
             server.createContext("/api/risk/idrs", exchange -> {
                 setCorsHeaders(exchange);
                 if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
                     sendResponse(exchange, 204, "");
+                    return;
+                }
+
+                if (!isAuthorized(exchange)) {
+                    sendResponse(exchange, 401, "{\"error\":\"Unauthorized: Valid HMAC-SHA256 JWT Bearer token required\"}");
                     return;
                 }
 
@@ -161,11 +166,16 @@ public class ApnaVaidyaServer {
                 }
             });
 
-            // Ayurvedic Prakriti Endpoint
+            // Ayurvedic Prakriti Endpoint (Protected)
             server.createContext("/api/ayurveda/prakriti", exchange -> {
                 setCorsHeaders(exchange);
                 if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
                     sendResponse(exchange, 204, "");
+                    return;
+                }
+
+                if (!isAuthorized(exchange)) {
+                    sendResponse(exchange, 401, "{\"error\":\"Unauthorized: Valid HMAC-SHA256 JWT Bearer token required\"}");
                     return;
                 }
 
@@ -188,11 +198,16 @@ public class ApnaVaidyaServer {
                 }
             });
 
-            // Organ Heatmap Vitality Endpoint
+            // Organ Heatmap Vitality Endpoint (Protected)
             server.createContext("/api/organs/heatmap", exchange -> {
                 setCorsHeaders(exchange);
                 if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
                     sendResponse(exchange, 204, "");
+                    return;
+                }
+
+                if (!isAuthorized(exchange)) {
+                    sendResponse(exchange, 401, "{\"error\":\"Unauthorized: Valid HMAC-SHA256 JWT Bearer token required\"}");
                     return;
                 }
 
@@ -219,11 +234,16 @@ public class ApnaVaidyaServer {
                 }
             });
 
-            // Symptom Red-Flag Triage Endpoint
+            // Symptom Red-Flag Triage Endpoint (Protected)
             server.createContext("/api/symptoms/triage", exchange -> {
                 setCorsHeaders(exchange);
                 if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
                     sendResponse(exchange, 204, "");
+                    return;
+                }
+
+                if (!isAuthorized(exchange)) {
+                    sendResponse(exchange, 401, "{\"error\":\"Unauthorized: Valid HMAC-SHA256 JWT Bearer token required\"}");
                     return;
                 }
 
@@ -250,11 +270,16 @@ public class ApnaVaidyaServer {
                 }
             });
 
-            // Wearables Biometrics Live Sync Endpoint
+            // Wearables Biometrics Live Sync Endpoint (Protected)
             server.createContext("/api/wearables/sync", exchange -> {
                 setCorsHeaders(exchange);
                 if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
                     sendResponse(exchange, 204, "");
+                    return;
+                }
+
+                if (!isAuthorized(exchange)) {
+                    sendResponse(exchange, 401, "{\"error\":\"Unauthorized: Valid HMAC-SHA256 JWT Bearer token required\"}");
                     return;
                 }
 
@@ -278,11 +303,16 @@ public class ApnaVaidyaServer {
                 }
             });
 
-            // What-If Lifestyle Scenario Simulation Endpoint
+            // What-If Lifestyle Scenario Simulation Endpoint (Protected)
             server.createContext("/api/simulation/what-if", exchange -> {
                 setCorsHeaders(exchange);
                 if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
                     sendResponse(exchange, 204, "");
+                    return;
+                }
+
+                if (!isAuthorized(exchange)) {
+                    sendResponse(exchange, 401, "{\"error\":\"Unauthorized: Valid HMAC-SHA256 JWT Bearer token required\"}");
                     return;
                 }
 
@@ -330,11 +360,16 @@ public class ApnaVaidyaServer {
                 }
             });
 
-            // Microbiome Profile Endpoint
+            // Microbiome Profile Endpoint (Protected)
             server.createContext("/api/microbiome/profile", exchange -> {
                 setCorsHeaders(exchange);
                 if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
                     sendResponse(exchange, 204, "");
+                    return;
+                }
+
+                if (!isAuthorized(exchange)) {
+                    sendResponse(exchange, 401, "{\"error\":\"Unauthorized: Valid HMAC-SHA256 JWT Bearer token required\"}");
                     return;
                 }
 
@@ -358,11 +393,16 @@ public class ApnaVaidyaServer {
                 }
             });
 
-            // Exposome City Endpoint
+            // Exposome City Endpoint (Protected)
             server.createContext("/api/exposome/city", exchange -> {
                 setCorsHeaders(exchange);
                 if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
                     sendResponse(exchange, 204, "");
+                    return;
+                }
+
+                if (!isAuthorized(exchange)) {
+                    sendResponse(exchange, 401, "{\"error\":\"Unauthorized: Valid HMAC-SHA256 JWT Bearer token required\"}");
                     return;
                 }
 
@@ -381,11 +421,16 @@ public class ApnaVaidyaServer {
                 sendResponse(exchange, 200, json);
             });
 
-            // Nutrition MNT Plan Endpoint
+            // Nutrition MNT Plan Endpoint (Protected)
             server.createContext("/api/nutrition/plan", exchange -> {
                 setCorsHeaders(exchange);
                 if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
                     sendResponse(exchange, 204, "");
+                    return;
+                }
+
+                if (!isAuthorized(exchange)) {
+                    sendResponse(exchange, 401, "{\"error\":\"Unauthorized: Valid HMAC-SHA256 JWT Bearer token required\"}");
                     return;
                 }
 
@@ -408,11 +453,16 @@ public class ApnaVaidyaServer {
                 }
             });
 
-            // Exercise Cardio-Metabolic Routine Endpoint
+            // Exercise Cardio-Metabolic Routine Endpoint (Protected)
             server.createContext("/api/exercise/routine", exchange -> {
                 setCorsHeaders(exchange);
                 if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
                     sendResponse(exchange, 204, "");
+                    return;
+                }
+
+                if (!isAuthorized(exchange)) {
+                    sendResponse(exchange, 401, "{\"error\":\"Unauthorized: Valid HMAC-SHA256 JWT Bearer token required\"}");
                     return;
                 }
 
@@ -434,11 +484,16 @@ public class ApnaVaidyaServer {
                 }
             });
 
-            // Pharmacogenomics (PGx) Matcher Endpoint
+            // Pharmacogenomics (PGx) Matcher Endpoint (Protected)
             server.createContext("/api/genomics/match", exchange -> {
                 setCorsHeaders(exchange);
                 if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
                     sendResponse(exchange, 204, "");
+                    return;
+                }
+
+                if (!isAuthorized(exchange)) {
+                    sendResponse(exchange, 401, "{\"error\":\"Unauthorized: Valid HMAC-SHA256 JWT Bearer token required\"}");
                     return;
                 }
 
@@ -499,11 +554,16 @@ public class ApnaVaidyaServer {
                 }
             });
 
-            // Medication Interaction Safety Endpoint
+            // Medication Interaction Safety Endpoint (Protected)
             server.createContext("/api/medications/interaction", exchange -> {
                 setCorsHeaders(exchange);
                 if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
                     sendResponse(exchange, 204, "");
+                    return;
+                }
+
+                if (!isAuthorized(exchange)) {
+                    sendResponse(exchange, 401, "{\"error\":\"Unauthorized: Valid HMAC-SHA256 JWT Bearer token required\"}");
                     return;
                 }
 
@@ -529,11 +589,16 @@ public class ApnaVaidyaServer {
                 }
             });
 
-            // Longevity Composite & Biological Aging Endpoint
+            // Longevity Composite & Biological Aging Endpoint (Protected)
             server.createContext("/api/longevity/score", exchange -> {
                 setCorsHeaders(exchange);
                 if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
                     sendResponse(exchange, 204, "");
+                    return;
+                }
+
+                if (!isAuthorized(exchange)) {
+                    sendResponse(exchange, 401, "{\"error\":\"Unauthorized: Valid HMAC-SHA256 JWT Bearer token required\"}");
                     return;
                 }
 
@@ -611,11 +676,16 @@ public class ApnaVaidyaServer {
                 }
             });
 
-            // Chikitsak AI Chat Endpoint
+            // Chikitsak AI Chat Endpoint (Protected)
             server.createContext("/api/chat/ask", exchange -> {
                 setCorsHeaders(exchange);
                 if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
                     sendResponse(exchange, 204, "");
+                    return;
+                }
+
+                if (!isAuthorized(exchange)) {
+                    sendResponse(exchange, 401, "{\"error\":\"Unauthorized: Valid HMAC-SHA256 JWT Bearer token required\"}");
                     return;
                 }
 
@@ -631,11 +701,16 @@ public class ApnaVaidyaServer {
                 }
             });
 
-            // ASCVD Risk Calculation Endpoint
+            // ASCVD Risk Calculation Endpoint (Protected)
             server.createContext("/api/risk/ascvd", exchange -> {
                 setCorsHeaders(exchange);
                 if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
                     sendResponse(exchange, 204, "");
+                    return;
+                }
+
+                if (!isAuthorized(exchange)) {
+                    sendResponse(exchange, 401, "{\"error\":\"Unauthorized: Valid HMAC-SHA256 JWT Bearer token required\"}");
                     return;
                 }
 
@@ -659,11 +734,16 @@ public class ApnaVaidyaServer {
                 }
             });
 
-            // Vascular Age & ePWV Endpoint
+            // Vascular Age & ePWV Endpoint (Protected)
             server.createContext("/api/vascular/age", exchange -> {
                 setCorsHeaders(exchange);
                 if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
                     sendResponse(exchange, 204, "");
+                    return;
+                }
+
+                if (!isAuthorized(exchange)) {
+                    sendResponse(exchange, 401, "{\"error\":\"Unauthorized: Valid HMAC-SHA256 JWT Bearer token required\"}");
                     return;
                 }
 
@@ -931,9 +1011,32 @@ public class ApnaVaidyaServer {
 
     private static void setCorsHeaders(HttpExchange exchange) {
         Headers headers = exchange.getResponseHeaders();
-        headers.set("Access-Control-Allow-Origin", "*");
+        String origin = exchange.getRequestHeaders().getFirst("Origin");
+        String envOrigins = System.getenv("ALLOWED_ORIGINS");
+
+        String allowOrigin = "http://localhost:5173"; // Safe default dev origin
+        if (envOrigins != null && !envOrigins.trim().isEmpty()) {
+            String[] allowed = envOrigins.split(",");
+            for (String a : allowed) {
+                if (origin != null && a.trim().equalsIgnoreCase(origin.trim())) {
+                    allowOrigin = origin;
+                    break;
+                }
+            }
+            if (origin != null && !allowOrigin.equals(origin) && allowed.length > 0) {
+                allowOrigin = allowed[0].trim();
+            }
+        } else if (origin != null) {
+            // Local dev & recognized hosting domains
+            if (origin.startsWith("http://localhost:") || origin.startsWith("http://127.0.0.1:") || origin.endsWith(".vercel.app") || origin.endsWith(".netlify.app") || origin.endsWith(".onrender.com")) {
+                allowOrigin = origin;
+            }
+        }
+
+        headers.set("Access-Control-Allow-Origin", allowOrigin);
         headers.set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
         headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization, Accept, X-Requested-With");
+        headers.set("Access-Control-Allow-Credentials", "true");
         headers.set("Content-Type", "application/json; charset=UTF-8");
     }
 

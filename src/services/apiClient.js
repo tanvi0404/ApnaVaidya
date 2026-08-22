@@ -156,7 +156,7 @@ export async function askChikitsakBackend({ userMessage, language, profileName, 
     const urlBase = await getBaseUrl();
     const res = await fetch(`${urlBase}/chat/ask`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify({
         userMessage,
         language,
@@ -179,7 +179,7 @@ export async function calculateAscvdBackend(ascvdParams) {
     const urlBase = await getBaseUrl();
     const res = await fetch(`${urlBase}/risk/ascvd`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(ascvdParams)
     });
     if (!res.ok) throw new Error(`HTTP error ${res.status}`);
@@ -195,7 +195,7 @@ export async function calculateIdrsBackend(idrsParams) {
     const urlBase = await getBaseUrl();
     const res = await fetch(`${urlBase}/risk/idrs`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(idrsParams)
     });
     if (!res.ok) throw new Error(`HTTP error ${res.status}`);
@@ -211,7 +211,7 @@ export async function calculateVascularBackend(vascularParams) {
     const urlBase = await getBaseUrl();
     const res = await fetch(`${urlBase}/vascular/age`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(vascularParams)
     });
     if (!res.ok) throw new Error(`HTTP error ${res.status}`);
@@ -352,7 +352,7 @@ export async function calculatePrakritiBackend(prakritiParams) {
     const urlBase = await getBaseUrl();
     const res = await fetch(`${urlBase}/ayurveda/prakriti`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(prakritiParams)
     });
     if (!res.ok) throw new Error(`HTTP error ${res.status}`);
@@ -368,7 +368,7 @@ export async function calculateOrganHeatmapBackend(organParams) {
     const urlBase = await getBaseUrl();
     const res = await fetch(`${urlBase}/organs/heatmap`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(organParams)
     });
     if (!res.ok) throw new Error(`HTTP error ${res.status}`);
@@ -384,7 +384,7 @@ export async function triageSymptomsBackend(symptoms, durationDays = 2) {
     const urlBase = await getBaseUrl();
     const res = await fetch(`${urlBase}/symptoms/triage`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ symptoms, durationDays })
     });
     if (!res.ok) throw new Error(`HTTP error ${res.status}`);
@@ -398,7 +398,7 @@ export async function triageSymptomsBackend(symptoms, durationDays = 2) {
 export async function fetchWearablesSyncBackend(profileId = 'user-arjun') {
   try {
     const urlBase = await getBaseUrl();
-    const res = await fetch(`${urlBase}/wearables/sync?profileId=${profileId}`);
+    const res = await fetch(`${urlBase}/wearables/sync?profileId=${profileId}`, { headers: getAuthHeaders() });
     if (!res.ok) throw new Error(`HTTP error ${res.status}`);
     return await res.json();
   } catch (err) {
@@ -412,7 +412,7 @@ export async function simulateWhatIfBackend(simParams) {
     const urlBase = await getBaseUrl();
     const res = await fetch(`${urlBase}/simulation/what-if`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(simParams)
     });
     if (!res.ok) throw new Error(`HTTP error ${res.status}`);
@@ -426,7 +426,7 @@ export async function simulateWhatIfBackend(simParams) {
 export async function fetchMicrobiomeProfileBackend(profileId = 'user-arjun') {
   try {
     const urlBase = await getBaseUrl();
-    const res = await fetch(`${urlBase}/microbiome/profile?profileId=${profileId}`);
+    const res = await fetch(`${urlBase}/microbiome/profile?profileId=${profileId}`, { headers: getAuthHeaders() });
     if (!res.ok) throw new Error(`HTTP error ${res.status}`);
     return await res.json();
   } catch (err) {
@@ -440,7 +440,7 @@ export async function fetchExposomeCityBackend(city = 'Delhi NCR') {
     const urlBase = await getBaseUrl();
     const res = await fetch(`${urlBase}/exposome/city`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ city })
     });
     if (!res.ok) throw new Error(`HTTP error ${res.status}`);
@@ -456,7 +456,7 @@ export async function fetchNutritionPlanBackend({ profileId = 'user-arjun', hba1
     const urlBase = await getBaseUrl();
     const res = await fetch(`${urlBase}/nutrition/plan`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ profileId, hba1c, ldl })
     });
     if (!res.ok) throw new Error(`HTTP error ${res.status}`);
@@ -472,7 +472,7 @@ export async function fetchExerciseRoutineBackend({ profileId = 'user-arjun', re
     const urlBase = await getBaseUrl();
     const res = await fetch(`${urlBase}/exercise/routine`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ profileId, restingHr })
     });
     if (!res.ok) throw new Error(`HTTP error ${res.status}`);
@@ -488,7 +488,7 @@ export async function matchGenomicsBackend({ drug = 'Clopidogrel', gene = 'CYP2C
     const urlBase = await getBaseUrl();
     const res = await fetch(`${urlBase}/genomics/match`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ drug, gene })
     });
     if (!res.ok) throw new Error(`HTTP error ${res.status}`);

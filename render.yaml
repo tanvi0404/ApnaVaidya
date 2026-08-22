@@ -11,3 +11,7 @@ services:
         value: production
       - key: PORT
         value: 3000
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ALLOWED_ORIGINS
+        value: https://apna-vaidya.onrender.com,http://localhost:5173
