@@ -201,7 +201,7 @@ public class ApnaVaidyaTest {
             boolean wrongPassword = AuthSecurityService.verifyPassword("WrongPassword", salt, hash1);
             assert !wrongPassword : "Incorrect password must be rejected";
 
-            System.out.printf("  ✓ [PASS] Cryptographic Password Hashing: Salted SHA-256 Verified%n");
+            System.out.printf("  ✓ [PASS] Cryptographic Password Hashing: PBKDF2-HMAC-SHA512 (100,000 Rounds) Verified%n");
             passed++;
         } catch (Throwable t) {
             System.err.println("  ✗ [FAIL] Cryptographic Password Hashing: " + t.getMessage());

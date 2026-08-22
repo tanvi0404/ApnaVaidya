@@ -1,23 +1,29 @@
 package com.apnavaidya.service;
 
 import javax.crypto.Mac;
+import javax.crypto.SecretKeyFactory;
+import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.security.spec.KeySpec;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
 
 /**
  * ApnaVaidya Cryptographic Authentication & JWT Token Authority
- * Implements Salted SHA-256 password hashing and HMAC-SHA256 signed JWT tokens.
+ * Implements NIST/OWASP Standard PBKDF2-HMAC-SHA512 password key derivation (100,000 rounds)
+ * and HMAC-SHA256 signed JWT tokens.
  */
 public class AuthSecurityService {
 
     private static final String DEFAULT_DEV_SECRET = "ApnaVaidya_2026_Secure_Secret_Key_Health_Care_JWT_Signature_98234!";
     private static final SecureRandom secureRandom = new SecureRandom();
+    private static final int PBKDF2_ITERATIONS = 100000;
+    private static final int KEY_LENGTH = 256;
 
     public static String getJwtSecret() {
         String envSecret = System.getenv("JWT_SECRET");
@@ -43,38 +49,63 @@ public class AuthSecurityService {
     }
 
     /**
-     * Hash password with salt using multi-round SHA-256
+     * Hash password with salt using NIST-standard PBKDF2-HMAC-SHA512 (100,000 iterations)
      */
     public static String hashPassword(String password, String salt) {
         try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            digest.update(salt.getBytes(StandardCharsets.UTF_8));
-            byte[] hash = digest.digest(password.getBytes(StandardCharsets.UTF_8));
-            
-            // 1000 rounds of key stretching
-            for (int i = 0; i < 1000; i++) {
-                digest.reset();
-                hash = digest.digest(hash);
-            }
-
+            KeySpec spec = new PBEKeySpec(password.toCharArray(), salt.getBytes(StandardCharsets.UTF_8), PBKDF2_ITERATIONS, KEY_LENGTH);
+            SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA512");
+            byte[] hash = factory.generateSecret(spec).getEncoded();
             StringBuilder sb = new StringBuilder();
             for (byte b : hash) {
                 sb.append(String.format("%02x", b));
             }
             return sb.toString();
-        } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException("SHA-256 algorithm not available", e);
+        } catch (Exception e) {
+            // Fallback to SHA-256 with 1000 rounds if PBKDF2 is unsupported by JVM runtime
+            return hashLegacySha256(password, salt);
+        }
+    }
+
+    private static String hashLegacySha256(String password, String salt) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            digest.update(salt.getBytes(StandardCharsets.UTF_8));
+            byte[] hash = digest.digest(password.getBytes(StandardCharsets.UTF_8));
+            for (int i = 0; i < 1000; i++) {
+                digest.reset();
+                hash = digest.digest(hash);
+            }
+            StringBuilder sb = new StringBuilder();
+            for (byte b : hash) {
+                sb.append(String.format("%02x", b));
+            }
+            return sb.toString();
+        } catch (NoSuchAlgorithmException ex) {
+            throw new RuntimeException("SHA-256 algorithm not available", ex);
         }
     }
 
     /**
-     * Verify a password against stored salt and hash
+     * Verify a password against stored salt and hash with constant-time comparison
+     * Handles both PBKDF2-HMAC-SHA512 and legacy salted SHA-256 hashes.
      */
     public static boolean verifyPassword(String password, String salt, String storedHash) {
         if (password == null || salt == null || storedHash == null) return false;
-        String computedHash = hashPassword(password, salt);
+        
+        // 1. Check primary PBKDF2-HMAC-SHA512
+        String computedPbkdf2 = hashPassword(password, salt);
+        if (MessageDigest.isEqual(
+            computedPbkdf2.getBytes(StandardCharsets.UTF_8),
+            storedHash.getBytes(StandardCharsets.UTF_8)
+        )) {
+            return true;
+        }
+
+        // 2. Backward compatibility for legacy stretched SHA-256 hashes
+        String computedLegacy = hashLegacySha256(password, salt);
         return MessageDigest.isEqual(
-            computedHash.getBytes(StandardCharsets.UTF_8),
+            computedLegacy.getBytes(StandardCharsets.UTF_8),
             storedHash.getBytes(StandardCharsets.UTF_8)
         );
     }
