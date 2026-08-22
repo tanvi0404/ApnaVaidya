@@ -49,7 +49,8 @@ export const COMMON_INTERACTIONS = [
 ];
 
 export default function MedicationManager({ activeProfile }) {
-  const initialMeds = MEDICATIONS_DATA[activeProfile.id] || MEDICATIONS_DATA['user-arjun'];
+  const isDemoProfile = ['user-arjun', 'user-rajesh', 'user-sunita', 'user-ananya'].includes(activeProfile?.id);
+  const initialMeds = MEDICATIONS_DATA[activeProfile?.id] || (isDemoProfile ? (MEDICATIONS_DATA['user-arjun'] || []) : []);
   const [medications, setMedications] = useState(initialMeds);
   const [activeTab, setActiveTab] = useState('schedule'); // 'schedule' | 'interactions'
   const [addModalOpen, setAddModalOpen] = useState(false);
@@ -285,7 +286,24 @@ export default function MedicationManager({ activeProfile }) {
               </span>
             </div>
 
-            <div className="divide-y divide-slate-100">
+            {medications.length === 0 ? (
+              <div className="py-12 text-center bg-slate-50 rounded-2xl border border-slate-200">
+                <Pill className="w-10 h-10 text-slate-300 mx-auto mb-2.5" />
+                <h4 className="text-sm font-bold text-slate-700">No Prescriptions Logged Yet</h4>
+                <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1">
+                  Add your daily medications, supplements, or scan a doctor's prescription slip with AI OCR.
+                </p>
+                <div className="mt-4 flex items-center justify-center gap-2">
+                  <button onClick={() => setAddModalOpen(true)} className="btn-primary-green text-xs">
+                    <Plus className="w-3.5 h-3.5" /> Add Medication
+                  </button>
+                  <button onClick={() => setRxOcrModalOpen(true)} className="btn-secondary-green text-xs">
+                    <Scan className="w-3.5 h-3.5" /> Scan Prescription (OCR)
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100">
               {medications.map((med) => {
                 const isTaken = Boolean(med.takenToday || med.status === 'taken');
                 
@@ -358,6 +376,7 @@ export default function MedicationManager({ activeProfile }) {
                 );
               })}
             </div>
+          )}
 
             {/* Safety Policy Box */}
             <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-xs text-slate-600 flex items-start gap-3">

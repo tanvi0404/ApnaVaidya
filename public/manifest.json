@@ -1,0 +1,17 @@
+{
+  "name": "ApnaVaidya — Your Health, Understood",
+  "short_name": "ApnaVaidya",
+  "description": "AI-Powered Personal Healthcare Platform & Clinical Diagnostic Vault",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#064E3B",
+  "theme_color": "#059669",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "192x192 512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
