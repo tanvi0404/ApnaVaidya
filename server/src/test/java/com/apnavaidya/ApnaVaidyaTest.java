@@ -310,6 +310,71 @@ public class ApnaVaidyaTest {
             failed++;
         }
 
+        // Test 13: Ayurvedic Prakriti Dosha Distribution & Dominance Logic
+        try {
+            ComprehensiveHealthService compService = new ComprehensiveHealthService();
+            Map<String, Object> prakriti = compService.calculatePrakriti(5, 3, 2);
+            int vata = (Integer) prakriti.get("vataPercentage");
+            int pitta = (Integer) prakriti.get("pittaPercentage");
+            int kapha = (Integer) prakriti.get("kaphaPercentage");
+            String dosha = (String) prakriti.get("dominantDosha");
+
+            assert (vata + pitta + kapha) == 100 : "Dosha percentages must sum to 100%";
+            assert vata == 50 : "Vata must equal 50% (5/10)";
+            assert pitta == 30 : "Pitta must equal 30% (3/10)";
+            assert kapha == 20 : "Kapha must equal 20% (2/10)";
+            assert dosha.contains("Vata") : "Dominant dosha must be Vata";
+
+            System.out.printf("  ✓ [PASS] Ayurvedic Prakriti Engine: %s (%d%% Vata, %d%% Pitta, %d%% Kapha)%n", dosha, vata, pitta, kapha);
+            passed++;
+        } catch (Throwable t) {
+            System.err.println("  ✗ [FAIL] Ayurvedic Prakriti Engine: " + t.getMessage());
+            failed++;
+        }
+
+        // Test 14: Pharmacogenomics (PGx) CPIC Matching
+        try {
+            ComprehensiveHealthService compService = new ComprehensiveHealthService();
+            Map<String, Object> pgx = compService.matchPharmacogenomics("Clopidogrel", "CYP2C19");
+            assert "Clopidogrel".equalsIgnoreCase((String) pgx.get("drug")) : "Drug must match";
+            assert "CYP2C19".equalsIgnoreCase((String) pgx.get("gene")) : "Gene must match";
+            assert pgx.get("cpicGuideline") != null : "CPIC guideline recommendations must be present";
+
+            System.out.printf("  ✓ [PASS] Pharmacogenomics (PGx) Matcher: Validated CPIC CYP2C19/Clopidogrel%n");
+            passed++;
+        } catch (Throwable t) {
+            System.err.println("  ✗ [FAIL] Pharmacogenomics (PGx) Matcher: " + t.getMessage());
+            failed++;
+        }
+
+        // Test 15: Longevity & Biological Aging Composite Index
+        try {
+            LongevityService longevityService = new LongevityService();
+            LongevityRequest lReq = new LongevityRequest();
+            lReq.setChronologicalAge(52);
+            lReq.setSystolicBp(126.0);
+            lReq.setTotalChol(195.0);
+            lReq.setHdlChol(48.0);
+            lReq.setHba1c(5.6);
+            lReq.setFastingGlucose(92.0);
+            lReq.setRestingHr(64);
+            lReq.setWeeklyExerciseMins(180);
+            lReq.setSleepHours(7.5);
+            lReq.setSmoker(false);
+
+            LongevityResponse lRes = longevityService.calculateLongevity(lReq);
+            assert lRes.getCompositeScore() >= 0 && lRes.getCompositeScore() <= 100 : "Longevity score must be bounded 0-100";
+            assert lRes.getAgingVelocity() > 0 : "Aging velocity must be positive";
+            assert lRes.getPriorityInterventions() != null && !lRes.getPriorityInterventions().isEmpty() : "Must have interventions";
+
+            System.out.printf("  ✓ [PASS] Longevity & Biological Age Engine: Score %d/100 (Bio-Age: %.1f yrs)%n",
+                lRes.getCompositeScore(), lRes.getEstimatedBiologicalAge());
+            passed++;
+        } catch (Throwable t) {
+            System.err.println("  ✗ [FAIL] Longevity & Biological Age Engine: " + t.getMessage());
+            failed++;
+        }
+
         System.out.println("==================================================");
         System.out.printf("🏁 Test Results: %d Passed, %d Failed%n", passed, failed);
         System.out.println("==================================================");

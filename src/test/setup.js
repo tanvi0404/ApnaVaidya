@@ -1,3 +1,5 @@
+import '@testing-library/jest-dom';
+
 // Vitest JSDOM environment polyfills
 if (typeof window !== 'undefined') {
   if (!window.DOMMatrix) {
@@ -10,4 +12,7 @@ if (typeof window !== 'undefined') {
   if (!globalThis.DOMMatrix) {
     globalThis.DOMMatrix = window.DOMMatrix;
   }
+
+  // Polyfill scrollIntoView for DOM element scrolling in chat
+  window.HTMLElement.prototype.scrollIntoView = function() {};
 }
