@@ -1,18 +1,4 @@
 import { PRELOADED_REPORTS } from '../data/reportsData';
-import { createWorker } from 'tesseract.js';
-import * as pdfjsLib from 'pdfjs-dist';
-
-// Configure PDF.js worker for Vite build environment
-try {
-  if (typeof window !== 'undefined' && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
-    pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-      'pdfjs-dist/build/pdf.worker.min.mjs',
-      import.meta.url
-    ).toString();
-  }
-} catch (e) {
-  console.warn('PDF.js worker initialization notice:', e.message);
-}
 
 /**
  * ApnaVaidya Real Clinical OCR & Multi-Format Laboratory Ingestion Engine
@@ -36,7 +22,7 @@ const BIOMARKER_PATTERNS = [
   {
     id: 'hba1c',
     name: 'Glycated Hemoglobin (HbA1c)',
-    regex: /(?:hba1c|glycated\s*hemoglobin|glycohemoglobin|a1c)[\s:=-]*([0-9.]+)/i,
+    regex: /(?:hba1c|glycated\s*hemoglobin|glycohemoglobin|a1c)[^0-9\n\r]*?[\s:=-]\s*([0-9.]+)/i,
     unit: '%',
     minNormal: 4.0,
     maxNormal: 5.6,
@@ -47,7 +33,7 @@ const BIOMARKER_PATTERNS = [
   {
     id: 'fbg',
     name: 'Fasting Blood Glucose',
-    regex: /(?:fasting\s*glucose|fasting\s*blood\s*sugar|fbg|glucose\s*fasting)[\s:=-]*([0-9.]+)/i,
+    regex: /(?:fasting\s*(?:blood\s*)?(?:glucose|sugar)|fbg|glucose\s*(?:-\s*)?fasting)[^0-9\n\r]*?[\s:=-]\s*([0-9.]+)/i,
     unit: 'mg/dL',
     minNormal: 70,
     maxNormal: 99,
@@ -58,7 +44,7 @@ const BIOMARKER_PATTERNS = [
   {
     id: 'ppbg',
     name: 'Postprandial Blood Glucose (PPBG)',
-    regex: /(?:postprandial\s*glucose|ppbg|post\s*meal\s*glucose|glucose\s*pp)[\s:=-]*([0-9.]+)/i,
+    regex: /(?:postprandial|post\s*meal|ppbg|glucose\s*pp|pp\s*glucose)[^0-9\n\r]*?[\s:=-]\s*([0-9.]+)/i,
     unit: 'mg/dL',
     minNormal: 80,
     maxNormal: 140,
@@ -69,7 +55,7 @@ const BIOMARKER_PATTERNS = [
   {
     id: 'cholesterol_total',
     name: 'Total Cholesterol',
-    regex: /(?:total\s*cholesterol|cholesterol\s*total)[\s:=-]*([0-9.]+)/i,
+    regex: /(?:total\s*cholesterol|cholesterol\s*(?:-\s*)?total)[^0-9\n\r]*?[\s:=-]\s*([0-9.]+)/i,
     unit: 'mg/dL',
     minNormal: 125,
     maxNormal: 200,
@@ -80,7 +66,7 @@ const BIOMARKER_PATTERNS = [
   {
     id: 'ldl',
     name: 'LDL-C (Low-Density Lipoprotein)',
-    regex: /(?:ldl(?:-c)?|low\s*density\s*lipoprotein)[\s:=-]*([0-9.]+)/i,
+    regex: /(?:ldl(?:-c)?|low\s*density\s*lipoprotein)[^0-9\n\r]*?[\s:=-]\s*([0-9.]+)/i,
     unit: 'mg/dL',
     minNormal: 50,
     maxNormal: 100,
@@ -91,7 +77,7 @@ const BIOMARKER_PATTERNS = [
   {
     id: 'hdl',
     name: 'HDL-C (High-Density Lipoprotein)',
-    regex: /(?:hdl(?:-c)?|high\s*density\s*lipoprotein)[\s:=-]*([0-9.]+)/i,
+    regex: /(?:hdl(?:-c)?|high\s*density\s*lipoprotein)[^0-9\n\r]*?[\s:=-]\s*([0-9.]+)/i,
     unit: 'mg/dL',
     minNormal: 40,
     maxNormal: 60,
@@ -102,7 +88,7 @@ const BIOMARKER_PATTERNS = [
   {
     id: 'triglycerides',
     name: 'Triglycerides',
-    regex: /(?:triglycerides?|tg|serum\s*triglycerides)[\s:=-]*([0-9.]+)/i,
+    regex: /(?:triglycerides?|tg|serum\s*triglycerides)[^0-9\n\r]*?[\s:=-]\s*([0-9.]+)/i,
     unit: 'mg/dL',
     minNormal: 50,
     maxNormal: 150,
@@ -113,7 +99,7 @@ const BIOMARKER_PATTERNS = [
   {
     id: 'creatinine',
     name: 'Serum Creatinine',
-    regex: /(?:serum\s*creatinine|creatinine)[\s:=-]*([0-9.]+)/i,
+    regex: /(?:serum\s*creatinine|creatinine)[^0-9\n\r]*?[\s:=-]\s*([0-9.]+)/i,
     unit: 'mg/dL',
     minNormal: 0.6,
     maxNormal: 1.2,
@@ -124,7 +110,7 @@ const BIOMARKER_PATTERNS = [
   {
     id: 'tsh',
     name: 'Thyroid Stimulating Hormone (TSH)',
-    regex: /(?:tsh|thyroid\s*stimulating\s*hormone)[\s:=-]*([0-9.]+)/i,
+    regex: /(?:tsh|thyroid\s*stimulating\s*hormone)[^0-9\n\r]*?[\s:=-]\s*([0-9.]+)/i,
     unit: 'uIU/mL',
     minNormal: 0.45,
     maxNormal: 4.5,
@@ -135,7 +121,7 @@ const BIOMARKER_PATTERNS = [
   {
     id: 'hb',
     name: 'Hemoglobin',
-    regex: /(?:hemoglobin|hb(?:\s*level)?)[\s:=-]*([0-9.]+)/i,
+    regex: /(?<!glycated\s*|glyco\s*)(?:\bhemoglobin\b|\bhb\b(?:\s*level)?)[^0-9\n\r]*?[\s:=-]\s*([0-9.]+)/i,
     unit: 'g/dL',
     minNormal: 12.0,
     maxNormal: 16.5,
@@ -146,7 +132,7 @@ const BIOMARKER_PATTERNS = [
   {
     id: 'wbc',
     name: 'Total Leukocyte Count (WBC)',
-    regex: /(?:total\s*leukocyte\s*count|tlc|wbc(?:\s*count)?)[\s:=-]*([0-9.]+)/i,
+    regex: /(?:total\s*leukocyte\s*count|tlc|wbc(?:\s*count)?)[^0-9\n\r]*?[\s:=-]\s*([0-9.]+)/i,
     unit: 'cells/mcL',
     minNormal: 4000,
     maxNormal: 11000,
@@ -157,7 +143,7 @@ const BIOMARKER_PATTERNS = [
   {
     id: 'platelets',
     name: 'Platelet Count',
-    regex: /(?:platelet\s*count|platelets)[\s:=-]*([0-9.]+)/i,
+    regex: /(?:platelet\s*count|platelets)[^0-9\n\r]*?[\s:=-]\s*([0-9.]+)/i,
     unit: 'lakh/mcL',
     minNormal: 1.5,
     maxNormal: 4.5,
@@ -168,7 +154,7 @@ const BIOMARKER_PATTERNS = [
   {
     id: 'vitd',
     name: 'Vitamin D3 (25-OH)',
-    regex: /(?:vitamin\s*d(?:3)?|25-oh\s*vitamin\s*d|vit\s*d3?)[\s:=-]*([0-9.]+)/i,
+    regex: /(?:vitamin\s*d(?:3)?|25-oh\s*vitamin\s*d|vit\s*d3?)[^0-9\n\r]*?[\s:=-]\s*([0-9.]+)/i,
     unit: 'ng/mL',
     minNormal: 30,
     maxNormal: 100,
@@ -179,7 +165,7 @@ const BIOMARKER_PATTERNS = [
   {
     id: 'vitb12',
     name: 'Vitamin B12 (Cobalamin)',
-    regex: /(?:vitamin\s*b12|vit\s*b12|cyanocobalamin)[\s:=-]*([0-9.]+)/i,
+    regex: /(?:vitamin\s*b12|vit\s*b12|cyanocobalamin)[^0-9\n\r]*?[\s:=-]\s*([0-9.]+)/i,
     unit: 'pg/mL',
     minNormal: 200,
     maxNormal: 900,
@@ -190,7 +176,7 @@ const BIOMARKER_PATTERNS = [
   {
     id: 'uric_acid',
     name: 'Serum Uric Acid',
-    regex: /(?:uric\s*acid|serum\s*uric\s*acid)[\s:=-]*([0-9.]+)/i,
+    regex: /(?:uric\s*acid|serum\s*uric\s*acid)[^0-9\n\r]*?[\s:=-]\s*([0-9.]+)/i,
     unit: 'mg/dL',
     minNormal: 3.5,
     maxNormal: 7.2,
@@ -201,7 +187,7 @@ const BIOMARKER_PATTERNS = [
   {
     id: 'alt_sgpt',
     name: 'SGPT / ALT (Alanine Aminotransferase)',
-    regex: /(?:sgpt|alt|alanine\s*aminotransferase)[\s:=-]*([0-9.]+)/i,
+    regex: /(?:sgpt|alt|alanine\s*aminotransferase)[^0-9\n\r]*?[\s:=-]\s*([0-9.]+)/i,
     unit: 'U/L',
     minNormal: 7,
     maxNormal: 56,
@@ -212,10 +198,20 @@ const BIOMARKER_PATTERNS = [
 ];
 
 /**
- * Extract text from Digital PDF files using PDF.js
+ * Extract text from Digital PDF files using PDF.js (Loaded on demand)
  */
 export async function extractTextFromPdf(file) {
   try {
+    const pdfjsLib = await import('pdfjs-dist');
+    if (typeof window !== 'undefined' && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
+      try {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+          'pdfjs-dist/build/pdf.worker.min.mjs',
+          import.meta.url
+        ).toString();
+      } catch (_) {}
+    }
+
     const arrayBuffer = await file.arrayBuffer();
     const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
     const pdfDoc = await loadingTask.promise;
@@ -228,13 +224,11 @@ export async function extractTextFromPdf(file) {
       fullText += pageStrings + '\n';
     }
 
-    // If PDF text layer contains content, return it
     if (fullText.trim().length > 20) {
       return fullText;
     }
 
-    // Fallback: If PDF is a scanned image container, OCR the first page canvas
-    console.info('PDF is scanned image container. Invoking Tesseract OCR on canvas...');
+    // Fallback: If scanned image in PDF
     const page = await pdfDoc.getPage(1);
     const viewport = page.getViewport({ scale: 1.5 });
     const canvas = document.createElement('canvas');
@@ -245,17 +239,18 @@ export async function extractTextFromPdf(file) {
     await page.render({ canvasContext: context, viewport }).promise;
     return await extractTextFromImage(canvas);
   } catch (err) {
-    console.warn('PDF text extraction error, trying direct stream:', err.message);
+    console.warn('PDF text extraction notice:', err.message);
     return '';
   }
 }
 
 /**
- * Extract text from Image files using Tesseract.js Neural OCR Worker
+ * Extract text from Image files using Tesseract.js (Loaded on demand)
  */
 export async function extractTextFromImage(fileOrCanvas, onProgress = null) {
   let worker = null;
   try {
+    const { createWorker } = await import('tesseract.js');
     worker = await createWorker('eng', 1, {
       logger: m => {
         if (typeof onProgress === 'function' && m.status === 'recognizing text') {
@@ -268,7 +263,7 @@ export async function extractTextFromImage(fileOrCanvas, onProgress = null) {
     await worker.terminate();
     return ret.data.text || '';
   } catch (err) {
-    console.error('Tesseract OCR error:', err);
+    console.error('Tesseract OCR notice:', err.message);
     if (worker) {
       try { await worker.terminate(); } catch (_) {}
     }

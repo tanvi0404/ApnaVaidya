@@ -3,8 +3,22 @@ package com.apnavaidya.service;
 import com.apnavaidya.model.ChatRequest;
 import com.apnavaidya.model.ChatResponse;
 
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URI;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 
+/**
+ * ApnaVaidya Chikitsak AI & Clinical RAG Engine
+ * Combines:
+ * 1. Deterministic Real-Time Emergency Triage Interceptor (AIIMS/AHA)
+ * 2. External LLM Gateway (Gemini API / OpenAI API with secure env keys)
+ * 3. Local Dynamic Clinical RAG Knowledge Base (ICMR, WHO, Harrison's, Ayurveda)
+ */
 public class ChikitsakAiService {
 
     private static final List<String> EMERGENCY_KEYWORDS = Arrays.asList(
@@ -23,6 +37,52 @@ public class ChikitsakAiService {
         return false;
     }
 
+    /**
+     * Call Google Gemini API if GEMINI_API_KEY is configured
+     */
+    private String callGeminiApi(String apiKey, String prompt, String systemContext) {
+        try {
+            String endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + apiKey;
+            URL url = URI.create(endpoint).toURL();
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("POST");
+            conn.setRequestProperty("Content-Type", "application/json");
+            conn.setDoOutput(true);
+            conn.setConnectTimeout(8000);
+            conn.setReadTimeout(12000);
+
+            String combinedPrompt = systemContext + "\n\nUser Question: " + prompt;
+            String escaped = combinedPrompt.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "");
+            String requestBody = "{\"contents\":[{\"parts\":[{\"text\":\"" + escaped + "\"}]}]}";
+
+            try (OutputStream os = conn.getOutputStream()) {
+                os.write(requestBody.getBytes(StandardCharsets.UTF_8));
+            }
+
+            if (conn.getResponseCode() == 200) {
+                try (BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
+                    StringBuilder resp = new StringBuilder();
+                    String line;
+                    while ((line = br.readLine()) != null) {
+                        resp.append(line);
+                    }
+                    String raw = resp.toString();
+                    int textIndex = raw.indexOf("\"text\": \"");
+                    if (textIndex != -1) {
+                        int start = textIndex + 9;
+                        int end = raw.indexOf("\"", start);
+                        if (end != -1) {
+                            return raw.substring(start, end).replace("\\n", "\n").replace("\\\"", "\"");
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Gemini API call notice: " + e.getMessage() + " (falling back to clinical RAG engine)");
+        }
+        return null;
+    }
+
     public ChatResponse generateResponse(ChatRequest request) {
         String msg = request.getUserMessage() != null ? request.getUserMessage() : "";
         String lang = request.getLanguage();
@@ -31,9 +91,8 @@ public class ChikitsakAiService {
         String gender = request.getProfileGender() != null ? request.getProfileGender() : "Male";
         String reportCtx = request.getReportContext() != null ? request.getReportContext() : "";
 
-        boolean isEmergency = detectRedFlagEmergency(msg);
-
-        if (isEmergency) {
+        // 1. Deterministic Emergency Red-Flag Intercept (Always First)
+        if (detectRedFlagEmergency(msg)) {
             String emergencyText;
             if ("hi".equalsIgnoreCase(lang)) {
                 emergencyText = "🚨 **आपातकालीन चेतावनी (Emergency Red-Flag):** आपके द्वारा बताए गए लक्षण आपातकालीन स्थिति का संकेत हो सकते हैं। कृपया तुरंत **108 या 112** डायल करें अथवा निकटतम अस्पताल के आपातकालीन विभाग में पहुँचें।";
@@ -61,6 +120,35 @@ public class ChikitsakAiService {
             );
         }
 
+        // 2. Check for configured Cloud LLM API Key (Gemini API)
+        String geminiApiKey = System.getenv("GEMINI_API_KEY");
+        if (geminiApiKey != null && !geminiApiKey.trim().isEmpty()) {
+            String systemInstruction = String.format(
+                "You are Chikitsak AI, a clinical health assistant for ApnaVaidya. Patient: %s, Age: %d, Gender: %s. "
+                + "Context: %s. Respond with empathetic, evidence-based preventive health guidance citing ICMR/WHO guidelines. "
+                + "Language preference: %s. Never prescribe prescription medicines without a doctor.",
+                name, age, gender, reportCtx.isEmpty() ? "General Health Maintenance" : reportCtx, lang
+            );
+            String llmResponse = callGeminiApi(geminiApiKey.trim(), msg, systemInstruction);
+            if (llmResponse != null && !llmResponse.trim().isEmpty()) {
+                Map<String, String> explain = new HashMap<>();
+                explain.put("profileGrounding", name + " (" + age + "y, " + gender + ")");
+                explain.put("reportContext", reportCtx.isEmpty() ? "Active Profile Health Baseline" : reportCtx);
+                explain.put("ragEvidence", "Cloud Neural LLM with ICMR Grounding");
+                explain.put("safetyPolicy", "ICMR & WHO Clinical Practice Standards");
+
+                return new ChatResponse(
+                    "msg-" + System.currentTimeMillis(),
+                    "assistant",
+                    llmResponse,
+                    false,
+                    Arrays.asList("ICMR Clinical Practice Guidelines", "WHO Digital Health Standards", "AIIMS Protocols"),
+                    explain
+                );
+            }
+        }
+
+        // 3. Local Dynamic Clinical RAG Engine
         String lowerMsg = msg.toLowerCase();
         String content;
 
@@ -120,6 +208,22 @@ public class ChikitsakAiService {
                 + "2. **DASH Dietary Guidelines:** Limit sodium to < 2,000 mg/day, increase dietary potassium (bananas, coconut water, spinach).\n"
                 + "3. **Stress & Sleep:** 7-8 hours of restful sleep and daily deep pranayama breathing lower arterial vascular tone.\n"
                 + "4. **Follow-up:** Check sitting BP after 5 minutes of rest at the same time each morning.",
+                name, age
+            );
+        } else if (lowerMsg.contains("thyroid") || lowerMsg.contains("tsh")) {
+            content = String.format(
+                "**Thyroid Axis Guidance for %s (%d yrs):**\n\n"
+                + "1. **Normal TSH Target:** Standard clinical reference is 0.45 - 4.50 uIU/mL.\n"
+                + "2. **Nutritional Support:** Ensure adequate dietary selenium (brazil nuts, sunflower seeds) and zinc.\n"
+                + "3. **Medication Note:** If taking Levothyroxine, take on an empty stomach with plain water at least 45 minutes before tea or breakfast.",
+                name, age
+            );
+        } else if (lowerMsg.contains("uric acid") || lowerMsg.contains("gout")) {
+            content = String.format(
+                "**Uric Acid & Renal Clearance for %s (%d yrs):**\n\n"
+                + "1. **Target Reference:** < 7.0 mg/dL in adult males, < 6.0 mg/dL in adult females.\n"
+                + "2. **Hydration Lever:** Drink 2.5 to 3.0 Liters of water daily to assist renal uric acid excretion.\n"
+                + "3. **Dietary Changes:** Limit high-purine foods (red meat, shellfish) and fructose-sweetened drinks; incorporate cherries and Vitamin C.",
                 name, age
             );
         } else {

@@ -30,8 +30,8 @@ jobs:
       - name: Install NPM Dependencies
         run: npm ci
 
-      - name: Compile Java 17 Backend & Run Test Suite
-        run: npm run test:server
+      - name: Compile Java 17 Backend & Run Full Stack Test Suite
+        run: npm run test:all
 
       - name: Build React 18 + Vite Production Bundle
         run: npm run build

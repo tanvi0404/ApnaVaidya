@@ -252,6 +252,64 @@ public class ApnaVaidyaTest {
             failed++;
         }
 
+        // Test 11: AES-256 GCM Authenticated Field Encryption at Rest
+        try {
+            String sensitiveLabNote = "Patient fasting blood glucose elevated at 148 mg/dL with microalbuminuria.";
+            String cipher = DatabaseManager.encryptField(sensitiveLabNote);
+            assert cipher != null && cipher.startsWith("enc_aes256:") : "Encrypted string must have enc_aes256: prefix";
+            assert !cipher.contains("glucose") : "Ciphertext must not expose plaintext biomarkers";
+
+            String decrypted = DatabaseManager.decryptField(cipher);
+            assert sensitiveLabNote.equals(decrypted) : "Decrypted text must match original plaintext";
+
+            System.out.printf("  ✓ [PASS] AES-256 GCM Cryptographic Vault: Field Encryption Verified%n");
+            passed++;
+        } catch (Throwable t) {
+            System.err.println("  ✗ [FAIL] AES-256 GCM Cryptographic Vault: " + t.getMessage());
+            failed++;
+        }
+
+        // Test 12: Chikitsak AI Emergency Intercept & Multi-Lingual RAG
+        try {
+            ChikitsakAiService aiService = new ChikitsakAiService();
+
+            // Check English emergency intercept
+            assert aiService.detectRedFlagEmergency("I am having severe crushing chest pain radiating to my left arm") : "Must detect acute cardiac red-flag";
+
+            // Check Hindi/Hinglish emergency intercept
+            assert aiService.detectRedFlagEmergency("Mujhe chhati me dard ho raha hai aur saans lene me dikkat hai") : "Must detect Hinglish cardiac red-flag";
+
+            ChatRequest emergencyReq = new ChatRequest();
+            emergencyReq.setUserMessage("I have sudden chest pain and can't breathe");
+            emergencyReq.setProfileName("Arjun Sharma");
+            emergencyReq.setProfileAge(52);
+            emergencyReq.setProfileGender("Male");
+            emergencyReq.setLanguage("en");
+
+            ChatResponse emergencyResp = aiService.generateResponse(emergencyReq);
+            assert emergencyResp.isEmergency() : "Emergency flag must be set to true";
+            assert emergencyResp.getContent().contains("108") || emergencyResp.getContent().contains("112") : "Emergency response must contain ambulance dial numbers";
+
+            // Check standard clinical RAG query
+            ChatRequest clinicalReq = new ChatRequest();
+            clinicalReq.setUserMessage("What should be my target LDL level and how to reduce it?");
+            clinicalReq.setProfileName("Arjun Sharma");
+            clinicalReq.setProfileAge(52);
+            clinicalReq.setProfileGender("Male");
+            clinicalReq.setLanguage("en");
+
+            ChatResponse clinicalResp = aiService.generateResponse(clinicalReq);
+            assert !clinicalResp.isEmergency() : "Clinical query must not flag emergency";
+            assert clinicalResp.getContent().contains("LDL") : "Response must ground on LDL clinical target";
+            assert clinicalResp.getCitations().contains("ICMR Clinical Practice Guidelines") : "Must cite ICMR guidelines";
+
+            System.out.printf("  ✓ [PASS] Chikitsak AI & Clinical RAG: Emergency Intercept & ICMR Grounding Verified%n");
+            passed++;
+        } catch (Throwable t) {
+            System.err.println("  ✗ [FAIL] Chikitsak AI & Clinical RAG: " + t.getMessage());
+            failed++;
+        }
+
         System.out.println("==================================================");
         System.out.printf("🏁 Test Results: %d Passed, %d Failed%n", passed, failed);
         System.out.println("==================================================");
