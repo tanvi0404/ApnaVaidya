@@ -1,7 +1,7 @@
-# 🌿 ApnaVaidya (अपना वैद्य) — Comprehensive AI Healthcare Platform
+# 🌿 ApnaVaidya (अपना वैद्य) — Personal AI Healthcare Platform
 
 > **Your Health, Understood.**  
-> An enterprise-grade, privacy-first personal healthcare decision-support platform featuring a **White + Emerald Green + Caring Rose Pink** clinical design system, on-device Neural OCR (`pdfjs-dist` + `tesseract.js`), and a high-performance **Java 17 REST API Backend** running with AES-256 GCM encrypted persistence, SQL schema migrations, and an immutable SHA-256 audit ledger.
+> A privacy-first personal healthcare decision-support platform featuring an on-device Neural OCR ingestion engine (`pdfjs-dist` + `tesseract.js`), multilingual clinical AI assistant, and a high-performance **Java 17 REST API Backend** running with AES-256 GCM encrypted persistence, SQL schema migrations, and an immutable SHA-256 audit ledger.
 
 [![CI Workflow](https://github.com/tanvi0404/ApnaVaidya/actions/workflows/ci.yml/badge.svg)](https://github.com/tanvi0404/ApnaVaidya/actions/workflows/ci.yml)
 [![Tests](https://img.shields.io/badge/Tests-27%2F27%20Passed-059669.svg)](https://github.com/tanvi0404/ApnaVaidya)
@@ -11,22 +11,22 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-64748B.svg)](https://opensource.org/licenses/MIT)
 
 > ⚠️ **IMPORTANT CLINICAL & MEDICAL DISCLAIMER**  
-> **ApnaVaidya is an educational and research healthcare decision-support platform.** It is not a certified medical device and does not replace professional medical judgment, clinical diagnosis, prescription writing, or emergency medical services. The AI insights and risk estimators are designed to assist patient health literacy. **In case of a medical emergency, immediately call 108 or 112 (India) or visit the nearest hospital emergency department.**
+> **ApnaVaidya is an educational and research healthcare decision-support platform.** It is not a certified diagnostic medical device and does not replace professional medical judgment, clinical diagnosis, prescription writing, or emergency medical services. The AI insights and risk estimators are designed to assist patient health literacy. **In case of a medical emergency, immediately call 108 or 112 (India) or visit the nearest hospital emergency department.**
 
 ---
 
-## 🌐 Live Deployments & Preview
+## 🌐 Live Deployments
 
-| Platform | Deployment Target | Status | Live Link |
-| :--- | :--- | :---: | :--- |
-| **🐳 Render** | **Full-Stack Container** (Java 17 REST API + Web UI) | `Blueprint Configured` | [`https://apna-vaidya.onrender.com`](https://dashboard.render.com) |
-| **⚡ Vercel** | **Edge CDN Web App** (On-Device OCR & UI Preview) | `Ready to Deploy` | [`https://apnavaidya.vercel.app`](https://vercel.com) |
+| Platform | Deployment Target | Live Link |
+| :--- | :--- | :--- |
+| **🐳 Render** | **Full-Stack Container** (Java 17 REST API + React Web UI) | [`https://apna-vaidya.onrender.com`](https://dashboard.render.com) |
+| **⚡ Vercel** | **Edge CDN Web App** (On-Device OCR & UI Preview) | [`https://apnavaidya.vercel.app`](https://vercel.com) |
 
 ---
 
-## 📐 System Architecture Diagrams
+## 📐 System Architecture
 
-### 1. High-Level Full-Stack Architecture
+### 1. Full-Stack Application Architecture
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
 │                   React 18 + Vite 5 Frontend (SPA)                     │
@@ -52,13 +52,13 @@
 ├───────────────────────────────────┬────────────────────────────────────┤
 │                                   │                                    │
 │   🛡️ AES-256 GCM Vault            │   📜 SQL Schema Migrator           │
-│   • Authenticated Encryption      │   • Automatic DDL Startup (6 tables)│
+│   • Encrypted Sensitive Data at Rest • Automatic DDL Startup (6 tables)│
 │   • Externalized Key (SHA-256)    │   • ReentrantReadWriteLock I/O     │
 │                                   │                                    │
 └───────────────────────────────────┴────────────────────────────────────┘
 ```
 
-### 2. Clinical Diagnostic Data Flow
+### 2. Diagnostic Document & Clinical Data Pipeline
 ```
 [User Uploads PDF / Scanned Image]
                │
@@ -77,47 +77,58 @@
 
 ---
 
-## 📊 Platform Feature Maturity Matrix
+## 🌟 Core Flagship Features
 
-### ✅ Fully Implemented, Verified & Tested
-* **🔐 Enterprise Authentication**: NIST SP 800-132 compliant PBKDF2-HMAC-SHA512 (100,000 iterations, 32-byte salt) + HMAC-SHA256 JWTs with 7-day expiry and constant-time signature comparison.
-* **🔒 100% Endpoint Shielding & CORS**: 20 of 20 protected REST routes enforce `isAuthorized()` Bearer validation. Origin-restricted CORS allowlist prevents cross-origin hijacking.
-* **📄 On-Device Neural OCR**: Browser-level `pdfjs-dist` text layer extractor and `tesseract.js` OCR parsing multi-format reports (`.pdf`, `.png`, `.jpg`, `.jpeg`, `.webp`, `.txt`, `.csv`).
-* **🤖 Chikitsak AI Assistant**: Zero-latency (<1ms) emergency red-flag triage (AIIMS/AHA) + Multi-Model LLM Gateway (Gemini 1.5, OpenAI GPT-4o, Ollama) + ICMR Clinical RAG in 4 languages (EN, HI, HG, PB).
-* **🗄️ Repositories & SQL Schema Migrations**: `SchemaMigrator.java` defines 6 DDL tables (`users`, `family_profiles`, `medical_reports`, `medications`, `audit_logs`, `clinical_prescriptions`) backed by thread-safe repositories.
-* **🛡️ AES-256 GCM Field Encryption**: Sensitive PII (`passwordHash`, `salt`, `bloodGroup`, `address`) stored encrypted at rest with 12-byte random IVs (`enc_aes256:`), externalized via `VAULT_ENCRYPTION_KEY`.
-* **📊 What-If Lifestyle Scenario Simulator**: Multivariate linear regression algorithms projecting 36-month drops in HbA1c, LDL, SBP, and weight with 3-year SVG curves.
-* **🫀 ASCVD & IDRS Clinical Risk Engines**: ACC/AHA 10-Year Cardiovascular Risk & ICMR-INDIAB Indian Diabetes Risk Score (0-100).
-* **💊 Medication Adherence & Interactions**: Real-time pill countdown inventory, dosage schedule, and automated contraindication rule checks.
-* **👨‍👩‍👧‍👦 Dynamic Family Vault & Clean Slate**: Demo accounts (`Demo@123`) showcase pre-seeded records; newly registered accounts start with an **uncluttered clean slate (0 reports, 0 meds)**.
-* **📜 Immutable Security Audit Trail**: Tamper-evident SHA-256 cryptographic audit ledger recording patient record access and consent events.
+1. **🤖 Chikitsak AI Clinical Assistant**:
+   - Zero-latency (<1ms) emergency red-flag triage (AIIMS/AHA).
+   - Multi-Model LLM Gateway (Gemini 1.5, OpenAI GPT-4o, Ollama) with robust JSON parsing.
+   - Dynamic Indian Clinical RAG grounded in ICMR & Harrison's guidelines across 4 languages (English, Hindi, Hinglish, Punjabi).
 
-### 🧪 Specialized Clinical Prototypes
-* **🌿 Ayurvedic Prakriti Engine**: Tri-Dosha constitutional distribution (Vata/Pitta/Kapha percentage) and Ahara/Dinacharya lifestyle recommendations.
+2. **📄 Medical Report OCR & Biomarker Extraction**:
+   - On-device PDF text layer extraction (`pdfjs-dist`) and neural image OCR (`tesseract.js`).
+   - Automatically identifies 16 clinical parameters (HbA1c, Lipid Profile, TSH, Fasting Glucose, Creatinine) and flags out-of-range biomarkers.
+
+3. **🫀 Clinical Risk Assessment**:
+   - ACC/AHA 10-Year ASCVD Cardiovascular Risk calculation.
+   - ICMR-INDIAB Indian Diabetes Risk Score (0-100) with category-stratified preventive lifestyle guidance.
+
+4. **💊 Prescription & Medication Intelligence**:
+   - Real-time dosage schedule, pill countdown inventory, and adherence logging.
+   - Automated drug-drug and drug-food contraindication checks.
+
+5. **📊 What-If Lifestyle Scenario Simulator**:
+   - Multivariate linear regression modeling projecting 36-month trajectories in HbA1c, LDL-C, SBP, and weight with 3-year SVG curves.
+
+6. **👨‍👩‍👧‍👦 Family Health Vault & Clean Slate**:
+   - Role-based profile isolation for parents, children, and dependents.
+   - Demo accounts (`Demo@123`) showcase pre-seeded records; newly registered accounts start with an **uncluttered clean slate (0 reports, 0 meds)**.
+   - Generates printable, multi-page Doctor-Ready Clinical Dossiers with digital verification signatures.
+
+---
+
+## 🧪 Additional Clinical Decision-Support Modules
+
+* **🌿 Ayurvedic Prakriti Engine**: Tri-Dosha constitutional distribution (Vata/Pitta/Kapha percentage) and Ahara/Dinacharya lifestyle guidance.
 * **🧬 Pharmacogenomics (PGx) Matcher**: CPIC Level precision drug-gene guidelines (`CYP2C19`, `SLCO1B1`, `CYP2D6`, `MTHFR`).
 * **⏳ Longevity & Biological Aging**: Multi-biomarker composite biological age vs chronological age calculation.
 * **🦠 Gut Microbiome & Chrono-Nutrition**: Gut flora diversity score, Short-Chain Fatty Acid (SCFA) gauges, and circadian fasting timer.
 * **🍃 AQI & Heat Exposome Shield**: Indian city pollutant and heatwave vulnerability index (Delhi, Mumbai, Bengaluru, Pune, Hyderabad, Kolkata).
 
-### 🚧 Planned Roadmap
-* **ABDM / ABHA Sandbox Integration**: Milestone 1-3 Health ID creation and HIU/HIP consent manager.
-* **FHIR R4 JSON Export**: International patient summary export formatted to HL7 FHIR Release 4.
-* **BLE Bluetooth Sensor Streaming**: Direct real-time Web Bluetooth pairing for blood glucose meters and pulse oximeters.
-
 ---
 
 ## 🏗️ Technical Stack Details
 
-| Layer | Technologies Used |
+| Layer | Architecture & Technology |
 | :--- | :--- |
 | **Frontend UI** | React 18, Vite 5, Tailwind CSS, Lucide React Icons, Web Speech API |
 | **On-Device OCR** | `pdfjs-dist` (Text Layer Extraction), `tesseract.js` (Neural Image OCR) |
-| **Backend Engine** | Java 17 (OpenJDK), `com.sun.net.httpserver.HttpServer`, `java.security` |
-| **Password Security** | PBKDF2-HMAC-SHA512 (100,000 rounds, 32-byte salt, constant-time verification) |
+| **Backend Engine** | Java 17 (OpenJDK), Multi-threaded `com.sun.net.httpserver.HttpServer` |
+| **Password Security** | NIST SP 800-132 PBKDF2-HMAC-SHA512 (100,000 rounds, 32-byte salt, constant-time verification) |
 | **Token Authority** | HMAC-SHA256 signed JSON Web Tokens (JWT) with 7-day expiration |
-| **At-Rest Encryption**| AES-256 GCM (12-byte random IV, 128-bit authentication tag) |
-| **Database Architecture** | File-backed atomic JSON tables + `SchemaMigrator` DDL + Repository Pattern |
-| **Testing Framework**| Vitest 4, `@testing-library/react`, `@testing-library/jest-dom`, Java 17 Suite |
+| **Security at Rest** | Authenticated AES-256 GCM field encryption (`enc_aes256:`) with 12-byte random IVs |
+| **Database Architecture** | Concurrent File-backed JSON Database (`server/data/*.json`) + `SchemaMigrator` SQL DDL Layer |
+| **Data Access Pattern** | Custom Repository Pattern (`UserRepository`, `MedicalReportRepository`, `MedicationRepository`) |
+| **Testing Framework**| Vitest 4, `@testing-library/react`, `@testing-library/jest-dom`, Java 17 Suite (27/27 Tests) |
 | **Container & Cloud**| Docker Multi-Stage (`Dockerfile`), Docker Compose, Render (`render.yaml`), Vercel (`vercel.json`) |
 
 ---
