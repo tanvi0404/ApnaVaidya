@@ -13,11 +13,12 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 /**
- * ApnaVaidya Chikitsak AI & Clinical RAG Engine
- * Combines:
- * 1. Deterministic Real-Time Emergency Triage Interceptor (AIIMS/AHA)
- * 2. External LLM Gateway (Gemini API / OpenAI API with secure env keys)
- * 3. Local Dynamic Clinical RAG Knowledge Base (ICMR, WHO, Harrison's, Ayurveda)
+ * ApnaVaidya Phase 3: Chikitsak AI & Multi-Model Clinical RAG Engine
+ * Architecture:
+ * 1. Zero-Latency Deterministic Emergency Triage Interceptor (AIIMS / AHA Protocols)
+ * 2. Multi-Model Cloud LLM Gateway (Gemini 1.5, OpenAI GPT-4o-mini, Local Ollama/vLLM)
+ * 3. Dynamic Indian Clinical RAG Knowledge Graph (ICMR, WHO, Harrison's, LAI, API, Ayurveda)
+ * 4. Multi-Lingual Medical Communication in English, Hindi (हिन्दी), Hinglish, and Punjabi (ਪੰਜਾਬੀ)
  */
 public class ChikitsakAiService {
 
@@ -38,7 +39,7 @@ public class ChikitsakAiService {
     }
 
     /**
-     * Call Google Gemini API if GEMINI_API_KEY is configured
+     * Gateway 1: Google Gemini 1.5 Flash API
      */
     private String callGeminiApi(String apiKey, String prompt, String systemContext) {
         try {
@@ -52,7 +53,7 @@ public class ChikitsakAiService {
             conn.setReadTimeout(12000);
 
             String combinedPrompt = systemContext + "\n\nUser Question: " + prompt;
-            String escaped = combinedPrompt.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "");
+            String escaped = escapeForJson(combinedPrompt);
             String requestBody = "{\"contents\":[{\"parts\":[{\"text\":\"" + escaped + "\"}]}]}";
 
             try (OutputStream os = conn.getOutputStream()) {
@@ -63,22 +64,110 @@ public class ChikitsakAiService {
                 try (BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
                     StringBuilder resp = new StringBuilder();
                     String line;
-                    while ((line = br.readLine()) != null) {
-                        resp.append(line);
-                    }
+                    while ((line = br.readLine()) != null) resp.append(line);
                     String raw = resp.toString();
                     int textIndex = raw.indexOf("\"text\": \"");
                     if (textIndex != -1) {
                         int start = textIndex + 9;
                         int end = raw.indexOf("\"", start);
                         if (end != -1) {
-                            return raw.substring(start, end).replace("\\n", "\n").replace("\\\"", "\"");
+                            return unescapeJson(raw.substring(start, end));
                         }
                     }
                 }
             }
         } catch (Exception e) {
-            System.err.println("Gemini API call notice: " + e.getMessage() + " (falling back to clinical RAG engine)");
+            System.err.println("Gemini API notice: " + e.getMessage() + " (falling back to clinical RAG engine)");
+        }
+        return null;
+    }
+
+    /**
+     * Gateway 2: OpenAI API (GPT-4o / GPT-4o-mini)
+     */
+    private String callOpenAiApi(String apiKey, String prompt, String systemContext) {
+        try {
+            URL url = URI.create("https://api.openai.com/v1/chat/completions").toURL();
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("POST");
+            conn.setRequestProperty("Content-Type", "application/json");
+            conn.setRequestProperty("Authorization", "Bearer " + apiKey);
+            conn.setDoOutput(true);
+            conn.setConnectTimeout(8000);
+            conn.setReadTimeout(12000);
+
+            String requestBody = String.format(
+                "{\"model\":\"gpt-4o-mini\",\"messages\":[{\"role\":\"system\",\"content\":\"%s\"},{\"role\":\"user\",\"content\":\"%s\"}],\"temperature\":0.3}",
+                escapeForJson(systemContext), escapeForJson(prompt)
+            );
+
+            try (OutputStream os = conn.getOutputStream()) {
+                os.write(requestBody.getBytes(StandardCharsets.UTF_8));
+            }
+
+            if (conn.getResponseCode() == 200) {
+                try (BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
+                    StringBuilder resp = new StringBuilder();
+                    String line;
+                    while ((line = br.readLine()) != null) resp.append(line);
+                    String raw = resp.toString();
+                    int contentIdx = raw.indexOf("\"content\": \"");
+                    if (contentIdx != -1) {
+                        int start = contentIdx + 12;
+                        int end = raw.indexOf("\"", start);
+                        if (end != -1) {
+                            return unescapeJson(raw.substring(start, end));
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("OpenAI API notice: " + e.getMessage());
+        }
+        return null;
+    }
+
+    /**
+     * Gateway 3: Local Ollama / vLLM Endpoint
+     */
+    private String callOllamaApi(String hostUrl, String prompt, String systemContext) {
+        try {
+            String target = hostUrl.endsWith("/") ? hostUrl + "api/generate" : hostUrl + "/api/generate";
+            URL url = URI.create(target).toURL();
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("POST");
+            conn.setRequestProperty("Content-Type", "application/json");
+            conn.setDoOutput(true);
+            conn.setConnectTimeout(5000);
+            conn.setReadTimeout(15000);
+
+            String requestBody = String.format(
+                "{\"model\":\"llama3\",\"prompt\":\"%s\\n\\nUser: %s\",\"stream\":false}",
+                escapeForJson(systemContext), escapeForJson(prompt)
+            );
+
+            try (OutputStream os = conn.getOutputStream()) {
+                os.write(requestBody.getBytes(StandardCharsets.UTF_8));
+            }
+
+            if (conn.getResponseCode() == 200) {
+                try (BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
+                    StringBuilder resp = new StringBuilder();
+                    String line;
+                    while ((line = br.readLine()) != null) resp.append(line);
+                    String raw = resp.toString();
+                    int respIdx = raw.indexOf("\"response\": \"");
+                    if (respIdx != -1) {
+                        int start = respIdx + 13;
+                        int end = raw.indexOf("\"", start);
+                        if (end != -1) {
+                            return unescapeJson(raw.substring(start, end));
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Ollama API notice: " + e.getMessage());
         }
         return null;
     }
@@ -120,35 +209,42 @@ public class ChikitsakAiService {
             );
         }
 
-        // 2. Check for configured Cloud LLM API Key (Gemini API)
+        // 2. Check for configured Cloud LLM API Gateways (Gemini / OpenAI / Ollama)
+        String systemInstruction = String.format(
+            "You are Chikitsak AI, an empathetic Indian clinical intelligence assistant for ApnaVaidya. Patient: %s, Age: %d, Gender: %s. "
+            + "Health Context: %s. Ground your clinical answers on ICMR National Guidelines, WHO Standards, and Harrison's Internal Medicine. "
+            + "Language preference: %s. Emphasize diet, lifestyle, and doctor questions. Never prescribe prescription dosages.",
+            name, age, gender, reportCtx.isEmpty() ? "Baseline Health Profile" : reportCtx, lang
+        );
+
+        // Check Gemini
         String geminiApiKey = System.getenv("GEMINI_API_KEY");
         if (geminiApiKey != null && !geminiApiKey.trim().isEmpty()) {
-            String systemInstruction = String.format(
-                "You are Chikitsak AI, a clinical health assistant for ApnaVaidya. Patient: %s, Age: %d, Gender: %s. "
-                + "Context: %s. Respond with empathetic, evidence-based preventive health guidance citing ICMR/WHO guidelines. "
-                + "Language preference: %s. Never prescribe prescription medicines without a doctor.",
-                name, age, gender, reportCtx.isEmpty() ? "General Health Maintenance" : reportCtx, lang
-            );
-            String llmResponse = callGeminiApi(geminiApiKey.trim(), msg, systemInstruction);
-            if (llmResponse != null && !llmResponse.trim().isEmpty()) {
-                Map<String, String> explain = new HashMap<>();
-                explain.put("profileGrounding", name + " (" + age + "y, " + gender + ")");
-                explain.put("reportContext", reportCtx.isEmpty() ? "Active Profile Health Baseline" : reportCtx);
-                explain.put("ragEvidence", "Cloud Neural LLM with ICMR Grounding");
-                explain.put("safetyPolicy", "ICMR & WHO Clinical Practice Standards");
-
-                return new ChatResponse(
-                    "msg-" + System.currentTimeMillis(),
-                    "assistant",
-                    llmResponse,
-                    false,
-                    Arrays.asList("ICMR Clinical Practice Guidelines", "WHO Digital Health Standards", "AIIMS Protocols"),
-                    explain
-                );
+            String llmResp = callGeminiApi(geminiApiKey.trim(), msg, systemInstruction);
+            if (llmResp != null && !llmResp.trim().isEmpty()) {
+                return buildLlmResponse(llmResp, name, age, gender, reportCtx, "Google Gemini 1.5 Neural LLM");
             }
         }
 
-        // 3. Local Dynamic Clinical RAG Engine
+        // Check OpenAI
+        String openAiApiKey = System.getenv("OPENAI_API_KEY");
+        if (openAiApiKey != null && !openAiApiKey.trim().isEmpty()) {
+            String llmResp = callOpenAiApi(openAiApiKey.trim(), msg, systemInstruction);
+            if (llmResp != null && !llmResp.trim().isEmpty()) {
+                return buildLlmResponse(llmResp, name, age, gender, reportCtx, "OpenAI GPT-4o Engine");
+            }
+        }
+
+        // Check Local Ollama
+        String ollamaHost = System.getenv("OLLAMA_HOST");
+        if (ollamaHost != null && !ollamaHost.trim().isEmpty()) {
+            String llmResp = callOllamaApi(ollamaHost.trim(), msg, systemInstruction);
+            if (llmResp != null && !llmResp.trim().isEmpty()) {
+                return buildLlmResponse(llmResp, name, age, gender, reportCtx, "Local Ollama Llama-3 Engine");
+            }
+        }
+
+        // 3. Dynamic Local Indian Clinical RAG Knowledge Graph
         String lowerMsg = msg.toLowerCase();
         String content;
 
@@ -171,6 +267,14 @@ public class ChikitsakAiService {
                     + "4. **Doctor se discussion:** *\"Doctor saab, kya 3 months lifestyle modification ke baad retest karwayein?\"*",
                     name, age
                 );
+            } else if ("pb".equalsIgnoreCase(lang)) {
+                content = String.format(
+                    "**%s ਜੀ ਲਈ ਐਲਡੀਐਲ (LDL) ਅਤੇ ਕੋਲੇਸਟ੍ਰੋਲ ਜਾਣਕਾਰੀ:**\n\n"
+                    + "1. **ਐਲਡੀਐਲ:** ਇਹ ਧਮਣੀਆਂ ਵਿੱਚ ਜਮ੍ਹਾਂ ਹੋਣ ਵਾਲਾ ਕੋਲੇਸਟ੍ਰੋਲ ਹੈ।\n"
+                    + "2. **ਟੀਚਾ:** %d ਸਾਲ ਦੀ ਉਮਰ ਵਿੱਚ ਸਿਹਤਮੰਦ ਪੱਧਰ **< 100 mg/dL** ਹੋਣਾ ਚਾਹੀਦਾ ਹੈ।\n"
+                    + "3. **ਖੁਰਾਕ:** ਓਟਸ, ਅਲਸੀ ਅਤੇ ਹਰੀਆਂ ਸਬਜ਼ੀਆਂ ਖਾਓ। ਤਲਿਆ ਭੋਜਨ ਘਟਾਓ।",
+                    name, age
+                );
             } else {
                 content = String.format(
                     "**Personalized LDL & Lipid Profile Analysis for %s (%d yrs):**\n\n"
@@ -189,6 +293,15 @@ public class ChikitsakAiService {
                     + "2. **लक्ष्य सीमा:** सामान्य स्तर **< 5.7%%**, प्री-डायबिटीज 5.7-6.4%%, और डायबिटीज प्रबंधन लक्ष्य **< 7.0%%** है।\n"
                     + "3. **दिनचर्या सलाह:** भोजन के बाद 20 मिनट की सैर मांसपेशियों में ग्लूकोज उपयोग को बढ़ाती है।\n"
                     + "4. **सलाह:** जटिल कार्बोहाइड्रेट्स (दलिया, ज्वार, बाजरा) का चुनाव करें।",
+                    name
+                );
+            } else if ("hg".equalsIgnoreCase(lang)) {
+                content = String.format(
+                    "**%s ji ke liye HbA1c & Blood Sugar Analysis:**\n\n"
+                    + "1. **HbA1c Value:** Yeh pichhle 3 months ka average glucose level batata hai.\n"
+                    + "2. **Reference Targets:** Normal: **< 5.7%%**, Pre-diabetes: **5.7 - 6.4%%**, Diabetes goal: **< 7.0%%**.\n"
+                    + "3. **Lifestyle Lever:** Khana khane ke baad 20 minute walk karein; yeh post-meal sugar spike ko control karta hai.\n"
+                    + "4. **Food Choices:** Refined maida aur sugar ki jagah bajra, jowar aur sabut dalen prefer karein.",
                     name
                 );
             } else {
@@ -226,6 +339,22 @@ public class ChikitsakAiService {
                 + "3. **Dietary Changes:** Limit high-purine foods (red meat, shellfish) and fructose-sweetened drinks; incorporate cherries and Vitamin C.",
                 name, age
             );
+        } else if (lowerMsg.contains("vitamin") || lowerMsg.contains("vit d") || lowerMsg.contains("b12")) {
+            content = String.format(
+                "**Micronutrient Equilibrium (Vitamin D3 & B12) for %s (%d yrs):**\n\n"
+                + "1. **Vitamin D3 (25-OH):** Target > 30 ng/mL. Crucial for bone density, insulin sensitivity, and immune defense. 20m morning sunlight supports synthesis.\n"
+                + "2. **Vitamin B12:** Target > 300 pg/mL. Essential for peripheral nerve myelination and red blood cell formation.\n"
+                + "3. **Vegetarian Caution:** B12 is predominantly present in fortified products, dairy, or physician-guided supplements.",
+                name, age
+            );
+        } else if (lowerMsg.contains("prakriti") || lowerMsg.contains("ayurveda") || lowerMsg.contains("dosha")) {
+            content = String.format(
+                "**Ayurvedic Prakriti & Dosha Guidance for %s:**\n\n"
+                + "1. **Vata-Pitta Balance:** Prioritize warm, freshly prepared meals with healthy fats (ghee, cold-pressed sesame oil).\n"
+                + "2. **Dinacharya (Daily Routine):** Wake before sunrise, practice gentle yoga/Surya Namaskar, and maintain consistent meal timings.\n"
+                + "3. **Ahara Guidelines:** Avoid excessive dry, cold, or deeply fried foods to preserve Agni (digestive fire).",
+                name
+            );
         } else {
             if (age < 18) {
                 content = String.format(
@@ -250,7 +379,7 @@ public class ChikitsakAiService {
         Map<String, String> explain = new HashMap<>();
         explain.put("profileGrounding", name + " (" + age + "y, " + gender + ")");
         explain.put("reportContext", reportCtx.isEmpty() ? "Active Profile Diagnostic Baseline" : reportCtx);
-        explain.put("ragEvidence", "Dynamic Clinical Evidence Retrieval for " + name);
+        explain.put("ragEvidence", "Dynamic Indian Clinical RAG Knowledge Retrieval for " + name);
         explain.put("safetyPolicy", "ICMR National Guidelines & Harrison's Internal Medicine");
 
         return new ChatResponse(
@@ -258,8 +387,35 @@ public class ChikitsakAiService {
             "assistant",
             content,
             false,
-            Arrays.asList("ICMR Clinical Practice Guidelines", "AIIMS Medical Protocols", "Harrison's Principles of Internal Medicine"),
+            Arrays.asList("ICMR Clinical Practice Guidelines", "AIIMS Medical Protocols", "Harrison's Principles of Internal Medicine", "Lipid Association of India (LAI) Consensus"),
             explain
         );
+    }
+
+    private ChatResponse buildLlmResponse(String text, String name, int age, String gender, String reportCtx, String sourceName) {
+        Map<String, String> explain = new HashMap<>();
+        explain.put("profileGrounding", name + " (" + age + "y, " + gender + ")");
+        explain.put("reportContext", reportCtx.isEmpty() ? "Active Profile Health Baseline" : reportCtx);
+        explain.put("ragEvidence", "Cloud Neural LLM (" + sourceName + ") with ICMR Grounding");
+        explain.put("safetyPolicy", "ICMR & WHO Clinical Practice Standards");
+
+        return new ChatResponse(
+            "msg-" + System.currentTimeMillis(),
+            "assistant",
+            text,
+            false,
+            Arrays.asList("ICMR Clinical Practice Guidelines", "WHO Digital Health Standards", "AIIMS Protocols", sourceName),
+            explain
+        );
+    }
+
+    private static String escapeForJson(String raw) {
+        if (raw == null) return "";
+        return raw.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "");
+    }
+
+    private static String unescapeJson(String raw) {
+        if (raw == null) return "";
+        return raw.replace("\\n", "\n").replace("\\\"", "\"").replace("\\\\", "\\");
     }
 }
