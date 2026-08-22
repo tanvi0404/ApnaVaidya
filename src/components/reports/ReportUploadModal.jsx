@@ -37,7 +37,7 @@ export default function ReportUploadModal({
 
   if (!isOpen) return null;
 
-  const handleStartAnalysis = (presetOrName) => {
+  const handleStartAnalysis = (presetOrName, rawTextContent = null) => {
     setIsProcessing(true);
     setCurrentStepIndex(0);
 
@@ -53,7 +53,8 @@ export default function ReportUploadModal({
           const profileId = activeProfile?.id || 'user-arjun';
           const analyzedReport = analyzeUploadedFile(
             typeof presetOrName === 'string' ? presetOrName : (presetOrName?.name || 'Comprehensive Health Report'),
-            profileId
+            profileId,
+            rawTextContent
           );
           setIsProcessing(false);
           const callback = onUploadComplete || onReportAnalyzed;
@@ -158,11 +159,28 @@ export default function ReportUploadModal({
           ) : (
             /* Upload Options & Quick Presets */
             <>
-              {/* Drag & Drop Box */}
-              <div 
-                className="border-2 border-dashed border-brand-green-300 hover:border-brand-green-500 rounded-3xl p-6 text-center bg-gradient-to-b from-brand-green-50/40 to-transparent transition-all cursor-pointer group"
-                onClick={() => handleStartAnalysis('Uploaded_Diagnostic_Report.pdf')}
-              >
+              {/* Drag & Drop Box with Real File Reader */}
+              <label className="border-2 border-dashed border-brand-green-300 hover:border-brand-green-500 rounded-3xl p-6 text-center bg-gradient-to-b from-brand-green-50/40 to-transparent transition-all cursor-pointer group block">
+                <input 
+                  type="file" 
+                  accept=".pdf,.txt,.csv,.png,.jpg,.jpeg,.json" 
+                  className="hidden" 
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      if (file.type.includes('text') || file.name.endsWith('.txt') || file.name.endsWith('.csv') || file.name.endsWith('.json')) {
+                        const reader = new FileReader();
+                        reader.onload = (event) => {
+                          const text = event.target?.result;
+                          handleStartAnalysis(file.name, text);
+                        };
+                        reader.readAsText(file);
+                      } else {
+                        handleStartAnalysis(file.name);
+                      }
+                    }
+                  }}
+                />
                 <div className="w-14 h-14 mx-auto rounded-2xl bg-white shadow-xs border border-brand-green-200 flex items-center justify-center text-brand-green-600 group-hover:scale-110 transition-transform mb-3">
                   <UploadCloud className="w-7 h-7" />
                 </div>
@@ -170,13 +188,13 @@ export default function ReportUploadModal({
                   Click to select or drag & drop your lab report
                 </h4>
                 <p className="text-xs text-slate-500 mt-1">
-                  Supports PDF, JPG, PNG, Scanned Laboratory Receipts (Up to 25 MB)
+                  Supports PDF, JPG, PNG, TXT, CSV Diagnostic Reports (Up to 25 MB)
                 </p>
                 <div className="mt-3 flex items-center justify-center gap-2 text-[11px] text-slate-400">
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
                   <span>256-bit AES Encrypted & Virus Scanned</span>
                 </div>
-              </div>
+              </label>
 
               {/* Instant Test Presets (Zero setup needed) */}
               <div>

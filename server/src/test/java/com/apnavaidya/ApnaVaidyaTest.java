@@ -185,6 +185,56 @@ public class ApnaVaidyaTest {
             failed++;
         }
 
+        // Test 8: Salted SHA-256 Multi-Round Password Hashing & Tamper Detection
+        try {
+            String password = "SecurePatientPassword#2026";
+            String salt = AuthSecurityService.generateSalt();
+            assert salt != null && salt.length() == 32 : "Salt must be a 32-char hex string (16 bytes)";
+
+            String hash1 = AuthSecurityService.hashPassword(password, salt);
+            String hash2 = AuthSecurityService.hashPassword(password, salt);
+            assert hash1.equals(hash2) : "Hash must be deterministic for identical salt and password";
+
+            boolean verified = AuthSecurityService.verifyPassword(password, salt, hash1);
+            assert verified : "Correct password must verify successfully";
+
+            boolean wrongPassword = AuthSecurityService.verifyPassword("WrongPassword", salt, hash1);
+            assert !wrongPassword : "Incorrect password must be rejected";
+
+            System.out.printf("  ✓ [PASS] Cryptographic Password Hashing: Salted SHA-256 Verified%n");
+            passed++;
+        } catch (Throwable t) {
+            System.err.println("  ✗ [FAIL] Cryptographic Password Hashing: " + t.getMessage());
+            failed++;
+        }
+
+        // Test 9: HMAC-SHA256 Signed JWT Token Generation & Signature Integrity
+        try {
+            String userId = "user-test-8492";
+            String email = "test.patient@apnavaidya.in";
+            String name = "Test Patient";
+
+            String token = AuthSecurityService.createJwtToken(userId, email, name);
+            assert token != null && token.split("\\.").length == 3 : "JWT must have header.payload.signature format";
+
+            Map<String, String> claims = AuthSecurityService.verifyJwtToken(token);
+            assert claims != null : "Valid token must decode and verify";
+            assert userId.equals(claims.get("sub")) : "Subject must match user ID";
+            assert email.equals(claims.get("email")) : "Email claim must match";
+
+            // Tamper token payload and verify rejection
+            String[] parts = token.split("\\.");
+            String tamperedToken = parts[0] + ".eyJzdWIiOiJoYWNrZXIifQ." + parts[2];
+            Map<String, String> tamperedClaims = AuthSecurityService.verifyJwtToken(tamperedToken);
+            assert tamperedClaims == null : "Tampered token must be rejected by signature validator";
+
+            System.out.printf("  ✓ [PASS] Cryptographic JWT Tokens: HMAC-SHA256 Signature Verified%n");
+            passed++;
+        } catch (Throwable t) {
+            System.err.println("  ✗ [FAIL] Cryptographic JWT Tokens: " + t.getMessage());
+            failed++;
+        }
+
         System.out.println("==================================================");
         System.out.printf("🏁 Test Results: %d Passed, %d Failed%n", passed, failed);
         System.out.println("==================================================");

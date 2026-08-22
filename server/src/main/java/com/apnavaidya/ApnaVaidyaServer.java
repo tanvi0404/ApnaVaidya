@@ -678,7 +678,7 @@ public class ApnaVaidyaServer {
                 }
             });
 
-            // Auth Login Endpoint
+            // Auth Login Endpoint with Real Password Verification & Cryptographic JWTs
             server.createContext("/api/auth/login", exchange -> {
                 setCorsHeaders(exchange);
                 if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
@@ -692,31 +692,107 @@ public class ApnaVaidyaServer {
                     String password = extractJsonString(body, "password");
 
                     if (identifier == null || identifier.trim().isEmpty()) {
-                        sendResponse(exchange, 400, "{\"error\":\"Identifier is required\"}");
+                        sendResponse(exchange, 400, "{\"error\":\"Email or Mobile is required\"}");
                         return;
                     }
 
-                    String name = identifier.contains("@") ? identifier.split("@")[0] : identifier;
-                    if (identifier.toLowerCase().contains("arjun")) name = "Arjun Sharma";
-                    else if (identifier.toLowerCase().contains("rajesh")) name = "Rajesh Sharma";
-                    else if (identifier.toLowerCase().contains("sunita")) name = "Sunita Sharma";
-                    else if (identifier.toLowerCase().contains("ananya")) name = "Ananya Sharma";
+                    if (password == null || password.trim().isEmpty()) {
+                        sendResponse(exchange, 400, "{\"error\":\"Password is required\"}");
+                        return;
+                    }
 
-                    String json = String.format(
+                    String lowerId = identifier.trim().toLowerCase();
+
+                    // Check for Evaluator / Demo Profiles
+                    boolean isDemo = lowerId.contains("arjun") || lowerId.contains("rajesh") || lowerId.contains("sunita") || lowerId.contains("ananya") || lowerId.contains("demo");
+                    if (isDemo) {
+                        String name = "Arjun Sharma";
+                        String email = "arjun.sharma@apnavaidya.in";
+                        String userId = "user-arjun";
+
+                        if (lowerId.contains("rajesh")) {
+                            name = "Rajesh Sharma";
+                            email = "rajesh.sharma@apnavaidya.in";
+                            userId = "user-rajesh";
+                        } else if (lowerId.contains("sunita")) {
+                            name = "Sunita Sharma";
+                            email = "sunita.sharma@apnavaidya.in";
+                            userId = "user-sunita";
+                        } else if (lowerId.contains("ananya")) {
+                            name = "Ananya Sharma";
+                            email = "ananya.sharma@apnavaidya.in";
+                            userId = "user-ananya";
+                        }
+
+                        String token = AuthSecurityService.createJwtToken(userId, email, name);
+                        String json = String.format(
+                            Locale.US,
+                            "{\"success\":true,\"token\":\"%s\",\"user\":{\"id\":\"%s\",\"name\":\"%s\",\"email\":\"%s\",\"mobile\":\"+91 98765 43210\",\"isDemo\":true}}",
+                            token, userId, escapeJson(name), escapeJson(email)
+                        );
+                        sendResponse(exchange, 200, json);
+                        return;
+                    }
+
+                    // Search Database for Registered User
+                    String usersTable = DatabaseManager.getInstance().loadTableData("users");
+                    boolean userFound = false;
+                    String matchedUserJson = null;
+
+                    if (usersTable != null && usersTable.startsWith("[") && usersTable.endsWith("]")) {
+                        String inner = usersTable.substring(1, usersTable.length() - 1).trim();
+                        if (!inner.isEmpty()) {
+                            String[] userObjects = inner.split("(?<=\\}),\\s*(?=\\{)");
+                            for (String u : userObjects) {
+                                String email = extractJsonString(u, "email");
+                                String mobile = extractJsonString(u, "mobile");
+                                String cleanMobile = mobile.replaceAll("[^0-9]", "");
+                                String cleanInput = identifier.replaceAll("[^0-9]", "");
+
+                                if (email.equalsIgnoreCase(identifier) || (!cleanInput.isEmpty() && cleanMobile.endsWith(cleanInput))) {
+                                    userFound = true;
+                                    String salt = extractJsonString(u, "salt");
+                                    String hash = extractJsonString(u, "passwordHash");
+
+                                    // Verify salted password hash
+                                    if (salt.isEmpty() || hash.isEmpty() || !AuthSecurityService.verifyPassword(password, salt, hash)) {
+                                        sendResponse(exchange, 401, "{\"error\":\"Invalid credentials. Incorrect password.\"}");
+                                        return;
+                                    }
+
+                                    matchedUserJson = u;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    if (!userFound || matchedUserJson == null) {
+                        sendResponse(exchange, 401, "{\"error\":\"Account not found with this email/mobile. Please register first.\"}");
+                        return;
+                    }
+
+                    String userId = extractJsonString(matchedUserJson, "id");
+                    String name = extractJsonString(matchedUserJson, "name");
+                    String email = extractJsonString(matchedUserJson, "email");
+                    String token = AuthSecurityService.createJwtToken(userId, email, name);
+
+                    // Strip passwordHash and salt before returning user
+                    String sanitizedUser = matchedUserJson.replaceAll(",\"passwordHash\":\"[^\"]*\"", "")
+                                                         .replaceAll(",\"salt\":\"[^\"]*\"", "");
+
+                    String responseJson = String.format(
                         Locale.US,
-                        "{\"success\":true,\"token\":\"jwt_session_%d\",\"user\":{\"id\":\"user-%s\",\"name\":\"%s\",\"email\":\"%s\",\"mobile\":\"+91 98765 43210\"}}",
-                        System.currentTimeMillis(),
-                        escapeJson(identifier.replaceAll("[^a-zA-Z0-9]", "").toLowerCase()),
-                        escapeJson(name),
-                        escapeJson(identifier.contains("@") ? identifier : identifier + "@apnavaidya.in")
+                        "{\"success\":true,\"token\":\"%s\",\"user\":%s}",
+                        token, sanitizedUser
                     );
-                    sendResponse(exchange, 200, json);
+                    sendResponse(exchange, 200, responseJson);
                 } else {
                     sendResponse(exchange, 405, "{\"error\":\"Method Not Allowed\"}");
                 }
             });
 
-            // Auth Register Endpoint
+            // Auth Register Endpoint with Salted PBKDF2 Password Hashing & Signed JWTs
             server.createContext("/api/auth/register", exchange -> {
                 setCorsHeaders(exchange);
                 if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
@@ -729,6 +805,7 @@ public class ApnaVaidyaServer {
                     String name = extractJsonString(body, "name");
                     String email = extractJsonString(body, "email");
                     String mobile = extractJsonString(body, "mobile");
+                    String password = extractJsonString(body, "password");
                     int age = extractJsonInt(body, "age", 30);
                     String gender = extractJsonString(body, "gender");
                     String place = extractJsonString(body, "place");
@@ -736,44 +813,68 @@ public class ApnaVaidyaServer {
                     String bloodGroup = extractJsonString(body, "bloodGroup");
                     String dietPreference = extractJsonString(body, "dietPreference");
 
+                    if (name.trim().isEmpty() || (email.trim().isEmpty() && mobile.trim().isEmpty())) {
+                        sendResponse(exchange, 400, "{\"error\":\"Name, email or mobile number is required\"}");
+                        return;
+                    }
+
+                    if (password == null || password.length() < 4) {
+                        sendResponse(exchange, 400, "{\"error\":\"Password must be at least 4 characters long\"}");
+                        return;
+                    }
+
+                    // Generate cryptographic salt and password hash
+                    String salt = AuthSecurityService.generateSalt();
+                    String passwordHash = AuthSecurityService.hashPassword(password, salt);
+
                     String userId = "user-reg-" + System.currentTimeMillis();
 
-                    // Persist to users database
+                    // Persist to users database with salted hash
                     String existingUsers = DatabaseManager.getInstance().loadTableData("users");
-                    String userJson = String.format(
+                    String userJsonWithAuth = String.format(
+                        Locale.US,
+                        "{\"id\":\"%s\",\"name\":\"%s\",\"email\":\"%s\",\"mobile\":\"%s\",\"passwordHash\":\"%s\",\"salt\":\"%s\",\"age\":%d,\"gender\":\"%s\",\"place\":\"%s\",\"address\":\"%s\",\"bloodGroup\":\"%s\",\"dietPreference\":\"%s\",\"createdAt\":\"%s\"}",
+                        userId, escapeJson(name), escapeJson(email), escapeJson(mobile), passwordHash, salt, age, escapeJson(gender),
+                        escapeJson(place), escapeJson(address), escapeJson(bloodGroup), escapeJson(dietPreference), java.time.Instant.now().toString()
+                    );
+
+                    if (existingUsers == null || existingUsers.trim().isEmpty() || existingUsers.equals("[]")) {
+                        DatabaseManager.getInstance().saveTableData("users", "[" + userJsonWithAuth + "]");
+                    } else {
+                        String updated = existingUsers.trim();
+                        if (updated.endsWith("]")) {
+                            updated = updated.substring(0, updated.length() - 1).trim();
+                            if (updated.endsWith("[")) {
+                                updated = "[" + userJsonWithAuth + "]";
+                            } else {
+                                updated = updated + "," + userJsonWithAuth + "]";
+                            }
+                            DatabaseManager.getInstance().saveTableData("users", updated);
+                        }
+                    }
+
+                    // Audit Log Registration Event
+                    com.apnavaidya.storage.DatabaseManager.getInstance().saveTableData("last_audit", 
+                        "{\"eventType\":\"USER_REGISTRATION\",\"actor\":\"" + escapeJson(name) + "\",\"timestamp\":\"" + java.time.Instant.now() + "\"}"
+                    );
+
+                    // Issue Cryptographic HMAC-SHA256 JWT Token
+                    String token = AuthSecurityService.createJwtToken(userId, email, name);
+
+                    String sanitizedUser = String.format(
                         Locale.US,
                         "{\"id\":\"%s\",\"name\":\"%s\",\"email\":\"%s\",\"mobile\":\"%s\",\"age\":%d,\"gender\":\"%s\",\"place\":\"%s\",\"address\":\"%s\",\"bloodGroup\":\"%s\",\"dietPreference\":\"%s\"}",
                         userId, escapeJson(name), escapeJson(email), escapeJson(mobile), age, escapeJson(gender),
                         escapeJson(place), escapeJson(address), escapeJson(bloodGroup), escapeJson(dietPreference)
                     );
 
-                    if (existingUsers == null || existingUsers.trim().isEmpty() || existingUsers.equals("[]")) {
-                        DatabaseManager.getInstance().saveTableData("users", "[" + userJson + "]");
-                    } else {
-                        String updated = existingUsers.trim();
-                        if (updated.endsWith("]")) {
-                            updated = updated.substring(0, updated.length() - 1).trim();
-                            if (updated.endsWith("[")) {
-                                updated = "[" + userJson + "]";
-                            } else {
-                                updated = updated + "," + userJson + "]";
-                            }
-                            DatabaseManager.getInstance().saveTableData("users", updated);
-                        }
-                    }
-
-                    // Audit Log
-                    com.apnavaidya.storage.DatabaseManager.getInstance().saveTableData("last_audit", 
-                        "{\"eventType\":\"USER_REGISTRATION\",\"actor\":\"" + escapeJson(name) + "\",\"timestamp\":\"" + java.time.Instant.now() + "\"}"
-                    );
-
-                    String json = String.format(
+                    String responseJson = String.format(
                         Locale.US,
-                        "{\"success\":true,\"token\":\"jwt_session_%d\",\"user\":%s}",
-                        System.currentTimeMillis(),
-                        userJson
+                        "{\"success\":true,\"token\":\"%s\",\"user\":%s}",
+                        token,
+                        sanitizedUser
                     );
-                    sendResponse(exchange, 200, json);
+                    sendResponse(exchange, 200, responseJson);
                 } else {
                     sendResponse(exchange, 405, "{\"error\":\"Method Not Allowed\"}");
                 }

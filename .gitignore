@@ -33,6 +33,10 @@ yarn-error.log*
 *.sln
 *.sw?
 
+# Runtime Database & Persistence Files
+server/data/*.json
+!server/data/default_schema.json
+
 # OS metadata
 .DS_Store
 Thumbs.db
