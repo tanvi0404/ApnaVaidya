@@ -1,17 +1,34 @@
 import { PRELOADED_REPORTS } from '../data/reportsData';
+import { createWorker } from 'tesseract.js';
+import * as pdfjsLib from 'pdfjs-dist';
+
+// Configure PDF.js worker for Vite build environment
+try {
+  if (typeof window !== 'undefined' && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+      'pdfjs-dist/build/pdf.worker.min.mjs',
+      import.meta.url
+    ).toString();
+  }
+} catch (e) {
+  console.warn('PDF.js worker initialization notice:', e.message);
+}
 
 /**
- * ApnaVaidya Real Clinical OCR & Lab Report Extraction Engine
- * Parses lab documents, extracts biomedical entities using regex NLP rules,
- * evaluates clinical reference ranges, and structures findings.
+ * ApnaVaidya Real Clinical OCR & Multi-Format Laboratory Ingestion Engine
+ * Handles:
+ * 1. Digital Text Reports (.txt, .csv, .json)
+ * 2. Multi-Page Digital PDF Lab Documents (.pdf)
+ * 3. Scanned Lab Receipts & Photos (.png, .jpg, .jpeg, .webp) via Tesseract Neural OCR
+ * 4. Biomedical Entity Extraction & Reference Interval Evaluation
  */
 
 export const OCR_STAGES = [
-  { step: 1, label: 'Document Ingestion & File Stream Decoding', duration: 400 },
-  { step: 2, label: 'Neural Text Layer & Tabular Data OCR Extraction', duration: 550 },
-  { step: 3, label: 'Clinical Entity Recognition & Unit Normalization', duration: 450 },
-  { step: 4, label: 'ICMR / ADA Reference Range Cross-Evaluation', duration: 400 },
-  { step: 5, label: 'Generating Plain-Language Diagnostic Insights', duration: 500 }
+  { step: 1, label: 'Document Stream Ingestion & Decoding', duration: 400 },
+  { step: 2, label: 'Neural OCR & Text Layer Extraction (PDF/Image)', duration: 800 },
+  { step: 3, label: 'Clinical Biomarker Entity Recognition & Parsing', duration: 500 },
+  { step: 4, label: 'ICMR / ADA Reference Range Cross-Evaluation', duration: 450 },
+  { step: 5, label: 'Generating Actionable EHR Insights & AI Summary', duration: 500 }
 ];
 
 // Clinical Biomarker Regex Pattern Definitions
@@ -19,7 +36,7 @@ const BIOMARKER_PATTERNS = [
   {
     id: 'hba1c',
     name: 'Glycated Hemoglobin (HbA1c)',
-    regex: /(?:hba1c|glycated\s*hemoglobin|a1c)[\s:]*([0-9.]+)/i,
+    regex: /(?:hba1c|glycated\s*hemoglobin|glycohemoglobin|a1c)[\s:=-]*([0-9.]+)/i,
     unit: '%',
     minNormal: 4.0,
     maxNormal: 5.6,
@@ -30,7 +47,7 @@ const BIOMARKER_PATTERNS = [
   {
     id: 'fbg',
     name: 'Fasting Blood Glucose',
-    regex: /(?:fasting\s*glucose|fbg|fasting\s*blood\s*sugar|glucose\s*fasting)[\s:]*([0-9.]+)/i,
+    regex: /(?:fasting\s*glucose|fasting\s*blood\s*sugar|fbg|glucose\s*fasting)[\s:=-]*([0-9.]+)/i,
     unit: 'mg/dL',
     minNormal: 70,
     maxNormal: 99,
@@ -39,31 +56,42 @@ const BIOMARKER_PATTERNS = [
     tip: 'Avoid simple sugars, late-night carbohydrates, and maintain regular sleep.'
   },
   {
+    id: 'ppbg',
+    name: 'Postprandial Blood Glucose (PPBG)',
+    regex: /(?:postprandial\s*glucose|ppbg|post\s*meal\s*glucose|glucose\s*pp)[\s:=-]*([0-9.]+)/i,
+    unit: 'mg/dL',
+    minNormal: 80,
+    maxNormal: 140,
+    category: 'Glycemic',
+    meaning: 'Blood glucose level 2 hours after a standardized meal.',
+    tip: 'Post-meal walking and fiber pre-loading significantly dampen postprandial glucose spikes.'
+  },
+  {
     id: 'cholesterol_total',
     name: 'Total Cholesterol',
-    regex: /(?:total\s*cholesterol|cholesterol\s*total)[\s:]*([0-9.]+)/i,
+    regex: /(?:total\s*cholesterol|cholesterol\s*total)[\s:=-]*([0-9.]+)/i,
     unit: 'mg/dL',
     minNormal: 125,
     maxNormal: 200,
     category: 'Lipid Profile',
-    meaning: 'Total circulating cholesterol encompassing HDL, LDL, and VLDL.',
+    meaning: 'Total circulating cholesterol encompassing HDL, LDL, and VLDL particles.',
     tip: 'Reduce saturated and trans-fats; incorporate walnuts, flaxseeds, and soluble fiber.'
   },
   {
     id: 'ldl',
     name: 'LDL-C (Low-Density Lipoprotein)',
-    regex: /(?:ldl(?:-c)?|low\s*density\s*lipoprotein)[\s:]*([0-9.]+)/i,
+    regex: /(?:ldl(?:-c)?|low\s*density\s*lipoprotein)[\s:=-]*([0-9.]+)/i,
     unit: 'mg/dL',
     minNormal: 50,
     maxNormal: 100,
     category: 'Lipid Profile',
-    meaning: 'Atherogenic lipoprotein responsible for arterial plaque buildup.',
+    meaning: 'Atherogenic lipoprotein responsible for arterial wall plaque formation.',
     tip: 'Daily aerobic exercise (Zone-2 cardio) and dietary plant sterols help reduce LDL.'
   },
   {
     id: 'hdl',
     name: 'HDL-C (High-Density Lipoprotein)',
-    regex: /(?:hdl(?:-c)?|high\s*density\s*lipoprotein)[\s:]*([0-9.]+)/i,
+    regex: /(?:hdl(?:-c)?|high\s*density\s*lipoprotein)[\s:=-]*([0-9.]+)/i,
     unit: 'mg/dL',
     minNormal: 40,
     maxNormal: 60,
@@ -74,18 +102,18 @@ const BIOMARKER_PATTERNS = [
   {
     id: 'triglycerides',
     name: 'Triglycerides',
-    regex: /(?:triglycerides?|tg)[\s:]*([0-9.]+)/i,
+    regex: /(?:triglycerides?|tg|serum\s*triglycerides)[\s:=-]*([0-9.]+)/i,
     unit: 'mg/dL',
     minNormal: 50,
     maxNormal: 150,
     category: 'Lipid Profile',
-    meaning: 'Fat particles circulating in blood used for cellular energy.',
+    meaning: 'Fat particles circulating in blood used for cellular energy storage.',
     tip: 'Limit refined flour, sugar-sweetened beverages, and alcohol.'
   },
   {
     id: 'creatinine',
     name: 'Serum Creatinine',
-    regex: /(?:serum\s*creatinine|creatinine)[\s:]*([0-9.]+)/i,
+    regex: /(?:serum\s*creatinine|creatinine)[\s:=-]*([0-9.]+)/i,
     unit: 'mg/dL',
     minNormal: 0.6,
     maxNormal: 1.2,
@@ -96,7 +124,7 @@ const BIOMARKER_PATTERNS = [
   {
     id: 'tsh',
     name: 'Thyroid Stimulating Hormone (TSH)',
-    regex: /(?:tsh|thyroid\s*stimulating\s*hormone)[\s:]*([0-9.]+)/i,
+    regex: /(?:tsh|thyroid\s*stimulating\s*hormone)[\s:=-]*([0-9.]+)/i,
     unit: 'uIU/mL',
     minNormal: 0.45,
     maxNormal: 4.5,
@@ -107,7 +135,7 @@ const BIOMARKER_PATTERNS = [
   {
     id: 'hb',
     name: 'Hemoglobin',
-    regex: /(?:hemoglobin|hb)[\s:]*([0-9.]+)/i,
+    regex: /(?:hemoglobin|hb(?:\s*level)?)[\s:=-]*([0-9.]+)/i,
     unit: 'g/dL',
     minNormal: 12.0,
     maxNormal: 16.5,
@@ -116,9 +144,31 @@ const BIOMARKER_PATTERNS = [
     tip: 'Include iron-rich foods (spinach, beetroot, jaggery, lentils) paired with Vitamin C.'
   },
   {
+    id: 'wbc',
+    name: 'Total Leukocyte Count (WBC)',
+    regex: /(?:total\s*leukocyte\s*count|tlc|wbc(?:\s*count)?)[\s:=-]*([0-9.]+)/i,
+    unit: 'cells/mcL',
+    minNormal: 4000,
+    maxNormal: 11000,
+    category: 'Complete Blood Count (CBC)',
+    meaning: 'Total circulating white blood cells essential for immune defense.',
+    tip: 'Elevated WBC often reflects acute immune response, infection, or bodily inflammation.'
+  },
+  {
+    id: 'platelets',
+    name: 'Platelet Count',
+    regex: /(?:platelet\s*count|platelets)[\s:=-]*([0-9.]+)/i,
+    unit: 'lakh/mcL',
+    minNormal: 1.5,
+    maxNormal: 4.5,
+    category: 'Complete Blood Count (CBC)',
+    meaning: 'Cell fragments essential for normal blood clotting and vascular repair.',
+    tip: 'Maintain adequate micronutrient intake and avoid unmonitored anticoagulants.'
+  },
+  {
     id: 'vitd',
     name: 'Vitamin D3 (25-OH)',
-    regex: /(?:vitamin\s*d(?:3)?|25-oh\s*vitamin\s*d)[\s:]*([0-9.]+)/i,
+    regex: /(?:vitamin\s*d(?:3)?|25-oh\s*vitamin\s*d|vit\s*d3?)[\s:=-]*([0-9.]+)/i,
     unit: 'ng/mL',
     minNormal: 30,
     maxNormal: 100,
@@ -127,20 +177,139 @@ const BIOMARKER_PATTERNS = [
     tip: '20 minutes of morning sun exposure and dietary fortification (milk, eggs, mushrooms).'
   },
   {
+    id: 'vitb12',
+    name: 'Vitamin B12 (Cobalamin)',
+    regex: /(?:vitamin\s*b12|vit\s*b12|cyanocobalamin)[\s:=-]*([0-9.]+)/i,
+    unit: 'pg/mL',
+    minNormal: 200,
+    maxNormal: 900,
+    category: 'Vitamins & Bone',
+    meaning: 'Essential vitamin for neurological function, DNA synthesis, and RBC production.',
+    tip: 'Crucial for vegetarians/vegans; incorporate fortified nutritional yeast or doctor-guided B12.'
+  },
+  {
     id: 'uric_acid',
     name: 'Serum Uric Acid',
-    regex: /(?:uric\s*acid|serum\s*uric\s*acid)[\s:]*([0-9.]+)/i,
+    regex: /(?:uric\s*acid|serum\s*uric\s*acid)[\s:=-]*([0-9.]+)/i,
     unit: 'mg/dL',
     minNormal: 3.5,
     maxNormal: 7.2,
-    category: 'Metabolic',
-    meaning: 'End product of purine nucleotide degradation.',
-    tip: 'Drink plenty of water; moderate consumption of purine-heavy foods.'
+    category: 'Metabolic Panel',
+    meaning: 'End product of purine nucleotide degradation filtered by the renal system.',
+    tip: 'Drink 2.5-3 liters of water daily. Moderate intake of high-purine foods.'
+  },
+  {
+    id: 'alt_sgpt',
+    name: 'SGPT / ALT (Alanine Aminotransferase)',
+    regex: /(?:sgpt|alt|alanine\s*aminotransferase)[\s:=-]*([0-9.]+)/i,
+    unit: 'U/L',
+    minNormal: 7,
+    maxNormal: 56,
+    category: 'Liver Function (LFT)',
+    meaning: 'Key enzyme released into bloodstream upon hepatocellular stress or injury.',
+    tip: 'Limit refined sugars, avoid alcohol, and maintain a healthy body mass index.'
   }
 ];
 
 /**
- * Extract structured biomarkers from text content
+ * Extract text from Digital PDF files using PDF.js
+ */
+export async function extractTextFromPdf(file) {
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+    const pdfDoc = await loadingTask.promise;
+    let fullText = '';
+
+    for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
+      const page = await pdfDoc.getPage(pageNum);
+      const textContent = await page.getTextContent();
+      const pageStrings = textContent.items.map(item => item.str).join(' ');
+      fullText += pageStrings + '\n';
+    }
+
+    // If PDF text layer contains content, return it
+    if (fullText.trim().length > 20) {
+      return fullText;
+    }
+
+    // Fallback: If PDF is a scanned image container, OCR the first page canvas
+    console.info('PDF is scanned image container. Invoking Tesseract OCR on canvas...');
+    const page = await pdfDoc.getPage(1);
+    const viewport = page.getViewport({ scale: 1.5 });
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    canvas.height = viewport.height;
+    canvas.width = viewport.width;
+
+    await page.render({ canvasContext: context, viewport }).promise;
+    return await extractTextFromImage(canvas);
+  } catch (err) {
+    console.warn('PDF text extraction error, trying direct stream:', err.message);
+    return '';
+  }
+}
+
+/**
+ * Extract text from Image files using Tesseract.js Neural OCR Worker
+ */
+export async function extractTextFromImage(fileOrCanvas, onProgress = null) {
+  let worker = null;
+  try {
+    worker = await createWorker('eng', 1, {
+      logger: m => {
+        if (typeof onProgress === 'function' && m.status === 'recognizing text') {
+          onProgress(Math.round(m.progress * 100));
+        }
+      }
+    });
+
+    const ret = await worker.recognize(fileOrCanvas);
+    await worker.terminate();
+    return ret.data.text || '';
+  } catch (err) {
+    console.error('Tesseract OCR error:', err);
+    if (worker) {
+      try { await worker.terminate(); } catch (_) {}
+    }
+    return '';
+  }
+}
+
+/**
+ * Multi-format universal text extractor (Text, CSV, PDF, Image)
+ */
+export async function extractTextFromFile(file, onProgress = null) {
+  if (!file) return '';
+
+  const fileName = (file.name || '').toLowerCase();
+  const fileType = (file.type || '').toLowerCase();
+
+  // 1. Plain Text / CSV / JSON
+  if (fileType.includes('text') || fileType.includes('json') || fileType.includes('csv') || fileName.endsWith('.txt') || fileName.endsWith('.csv') || fileName.endsWith('.json')) {
+    return await file.text();
+  }
+
+  // 2. Digital PDF Document
+  if (fileType.includes('pdf') || fileName.endsWith('.pdf')) {
+    return await extractTextFromPdf(file);
+  }
+
+  // 3. Scanned Image / Photo (PNG, JPG, JPEG, WEBP)
+  if (fileType.startsWith('image/') || fileName.endsWith('.png') || fileName.endsWith('.jpg') || fileName.endsWith('.jpeg') || fileName.endsWith('.webp')) {
+    return await extractTextFromImage(file, onProgress);
+  }
+
+  // Default fallback
+  try {
+    return await file.text();
+  } catch (_) {
+    return '';
+  }
+}
+
+/**
+ * Extract structured clinical biomarkers from text stream
  */
 export function parseBiomarkersFromText(text) {
   if (!text || typeof text !== 'string') return [];
@@ -156,7 +325,7 @@ export function parseBiomarkersFromText(text) {
         else if (val < def.minNormal) status = 'LOW';
 
         extracted.push({
-          id: `param-${def.id}-${Date.now()}`,
+          id: `param-${def.id}-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
           name: def.name,
           category: def.category,
           value: val,
@@ -182,20 +351,29 @@ export function parseBiomarkersFromText(text) {
 }
 
 /**
- * Main OCR ingestion and analysis function
+ * Main Async OCR Ingestion & Analysis Function
  */
-export function analyzeUploadedFile(fileOrPresetName, activeProfileId, rawTextContent = null) {
-  // If raw text was provided, parse actual text
-  if (rawTextContent && typeof rawTextContent === 'string' && rawTextContent.trim().length > 0) {
-    const parsedParams = parseBiomarkersFromText(rawTextContent);
+export async function analyzeUploadedFileAsync(fileOrPresetName, activeProfileId, rawTextContent = null, onProgress = null) {
+  let text = rawTextContent || '';
+  const isFileObject = typeof fileOrPresetName === 'object' && fileOrPresetName !== null && typeof fileOrPresetName.arrayBuffer === 'function';
+  const name = isFileObject ? fileOrPresetName.name : (typeof fileOrPresetName === 'string' ? fileOrPresetName : 'Diagnostic Report');
+
+  // If File object passed without pre-extracted text, run multi-format extractor
+  if (isFileObject && (!text || text.trim().length === 0)) {
+    text = await extractTextFromFile(fileOrPresetName, onProgress);
+  }
+
+  // If text was extracted, parse clinical biomarkers
+  if (text && typeof text === 'string' && text.trim().length > 0) {
+    const parsedParams = parseBiomarkersFromText(text);
     if (parsedParams.length > 0) {
       const abnormal = parsedParams.filter(p => p.status !== 'NORMAL');
       return {
         id: `rep-${Date.now()}`,
         profileId: activeProfileId,
-        title: typeof fileOrPresetName === 'string' ? fileOrPresetName : 'Extracted Lab Report',
+        title: name,
         category: 'Diagnostic Investigation',
-        labName: 'Accredited NABL Diagnostic Center',
+        labName: 'Extracted via ApnaVaidya Neural OCR Engine',
         testDate: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
         uploadDate: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
         status: 'Analyzed',
@@ -203,7 +381,7 @@ export function analyzeUploadedFile(fileOrPresetName, activeProfileId, rawTextCo
         summary: {
           overallStatus: abnormal.length > 0 ? 'Actionable Findings Detected' : 'All Primary Biomarkers Optimal',
           keyFindings: [
-            `Successfully extracted ${parsedParams.length} laboratory biomarkers via OCR stream.`,
+            `Successfully extracted ${parsedParams.length} laboratory biomarkers directly from document text.`,
             abnormal.length > 0
               ? `${abnormal.length} parameter(s) (${abnormal.map(p => p.name).join(', ')}) indicate values outside reference intervals.`
               : 'All evaluated biochemical parameters demonstrate physiological equilibrium.'
@@ -219,9 +397,7 @@ export function analyzeUploadedFile(fileOrPresetName, activeProfileId, rawTextCo
     }
   }
 
-  const name = typeof fileOrPresetName === 'string' ? fileOrPresetName : (fileOrPresetName?.name || '');
-
-  // Check if preset matches standard lab titles
+  // Check if preset matches standard verified reports
   const match = PRELOADED_REPORTS.find(r => 
     r.title.toLowerCase().includes(name.toLowerCase()) || 
     name.toLowerCase().includes(r.title.toLowerCase())
@@ -240,7 +416,7 @@ export function analyzeUploadedFile(fileOrPresetName, activeProfileId, rawTextCo
   return {
     id: `rep-${Date.now()}`,
     profileId: activeProfileId,
-    title: name || 'Uploaded Health Document',
+    title: name,
     category: 'Diagnostic Investigation',
     labName: 'Custom Upload / Scanned Document',
     testDate: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
@@ -251,10 +427,87 @@ export function analyzeUploadedFile(fileOrPresetName, activeProfileId, rawTextCo
       overallStatus: 'No Structured Biomarkers Detected in Text Layer',
       keyFindings: [
         `Ingested document '${name}'.`,
-        'No standard biochemical reference markers (e.g. HbA1c, LDL, FBG, TSH, Creatinine) were detected in the text layer.',
-        'To test full diagnostic analysis, upload a text/CSV report containing lab values or select one of the preloaded clinical panels.'
+        'No standard biochemical reference markers (e.g. HbA1c, LDL, FBG, TSH, Creatinine) were detected in the OCR text layer.',
+        'To test full diagnostic analysis, upload a clear diagnostic lab report (PDF, image scan, TXT/CSV) or select one of the preloaded clinical panels.'
       ],
       aiRecommendation: 'Please ensure your uploaded report includes standard test names and numerical values, or test with our preloaded lab panels.',
+      normalCount: 0,
+      abnormalCount: 0
+    },
+    parameters: []
+  };
+}
+
+// Synchronous wrapper for backward compatibility
+export function analyzeUploadedFile(fileOrPresetName, activeProfileId, rawTextContent = null) {
+  const isFileObject = typeof fileOrPresetName === 'object' && fileOrPresetName !== null && typeof fileOrPresetName.arrayBuffer === 'function';
+  const name = isFileObject ? fileOrPresetName.name : (typeof fileOrPresetName === 'string' ? fileOrPresetName : 'Diagnostic Report');
+
+  if (rawTextContent && typeof rawTextContent === 'string' && rawTextContent.trim().length > 0) {
+    const parsedParams = parseBiomarkersFromText(rawTextContent);
+    if (parsedParams.length > 0) {
+      const abnormal = parsedParams.filter(p => p.status !== 'NORMAL');
+      return {
+        id: `rep-${Date.now()}`,
+        profileId: activeProfileId,
+        title: name,
+        category: 'Diagnostic Investigation',
+        labName: 'Extracted via ApnaVaidya Neural OCR Engine',
+        testDate: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
+        uploadDate: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
+        status: 'Analyzed',
+        badgeCount: abnormal.length > 0 ? `${abnormal.length} Out of Range` : 'All Optimal',
+        summary: {
+          overallStatus: abnormal.length > 0 ? 'Actionable Findings Detected' : 'All Primary Biomarkers Optimal',
+          keyFindings: [
+            `Successfully extracted ${parsedParams.length} laboratory biomarkers directly from document text.`,
+            abnormal.length > 0
+              ? `${abnormal.length} parameter(s) (${abnormal.map(p => p.name).join(', ')}) indicate values outside reference intervals.`
+              : 'All evaluated biochemical parameters demonstrate physiological equilibrium.'
+          ],
+          aiRecommendation: abnormal.length > 0
+            ? 'Review the elevated parameters with your primary physician. Adhere to low glycemic and heart-healthy dietary advice.'
+            : 'Maintain current nutrition, physical activity, and hydration routines.',
+          normalCount: parsedParams.length - abnormal.length,
+          abnormalCount: abnormal.length
+        },
+        parameters: parsedParams
+      };
+    }
+  }
+
+  const match = PRELOADED_REPORTS.find(r => 
+    r.title.toLowerCase().includes(name.toLowerCase()) || 
+    name.toLowerCase().includes(r.title.toLowerCase())
+  );
+
+  if (match) {
+    return {
+      ...match,
+      id: `rep-${Date.now()}`,
+      profileId: activeProfileId,
+      uploadDate: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+    };
+  }
+
+  return {
+    id: `rep-${Date.now()}`,
+    profileId: activeProfileId,
+    title: name,
+    category: 'Diagnostic Investigation',
+    labName: 'Custom Upload / Scanned Document',
+    testDate: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
+    uploadDate: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
+    status: 'Needs Review',
+    badgeCount: 'Review Required',
+    summary: {
+      overallStatus: 'No Structured Biomarkers Detected in Text Layer',
+      keyFindings: [
+        `Ingested document '${name}'.`,
+        'No standard biochemical reference markers were detected.',
+        'To test full diagnostic analysis, upload a clear lab report or choose a preloaded clinical panel.'
+      ],
+      aiRecommendation: 'Please ensure your uploaded report includes standard test names and numerical values.',
       normalCount: 0,
       abnormalCount: 0
     },
