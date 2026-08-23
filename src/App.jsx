@@ -117,14 +117,16 @@ export default function App() {
   // Dynamic Family Profiles (Preloaded for Demo or User's Own Family for Personal Accounts)
   const [familyProfiles, setFamilyProfiles] = useState(() => {
     try {
+      const custom = localStorage.getItem('apnavaidya_custom_profiles');
+      const customList = custom ? JSON.parse(custom) : [];
+      if (customList && customList.length > 0) {
+        return customList.map(normalizeProfile);
+      }
       const savedUser = localStorage.getItem('apnavaidya_auth_user');
       const user = savedUser ? JSON.parse(savedUser) : null;
       if (user?.isDemo) {
         return FAMILY_PROFILES.map(normalizeProfile);
       }
-      const custom = localStorage.getItem('apnavaidya_custom_profiles');
-      const customList = custom ? JSON.parse(custom) : [];
-      if (customList.length > 0) return customList.map(normalizeProfile);
       return user ? [normalizeProfile(user)] : FAMILY_PROFILES.map(normalizeProfile);
     } catch (_) {
       return FAMILY_PROFILES.map(normalizeProfile);
@@ -138,8 +140,11 @@ export default function App() {
 
   // Active Family Profile
   const [activeProfile, setActiveProfile] = useState(() => {
+    const custom = localStorage.getItem('apnavaidya_custom_profiles');
+    const customList = custom ? JSON.parse(custom) : [];
+    const profiles = (customList && customList.length > 0) ? customList : familyProfiles;
     const saved = localStorage.getItem('apnavaidya_active_profile_id');
-    const matched = familyProfiles.find(p => p.id === saved) || familyProfiles[0] || FAMILY_PROFILES[0];
+    const matched = profiles.find(p => p.id === saved) || profiles[0] || FAMILY_PROFILES[0];
     return normalizeProfile(matched);
   });
 
@@ -186,14 +191,17 @@ export default function App() {
     } catch (_) {}
 
     if (isDemo) {
-      const normList = FAMILY_PROFILES.map(normalizeProfile);
+      const custom = localStorage.getItem('apnavaidya_custom_profiles');
+      const customList = custom ? JSON.parse(custom) : [];
+      const normList = (customList && customList.length > 0)
+        ? customList.map(normalizeProfile)
+        : FAMILY_PROFILES.map(normalizeProfile);
       setFamilyProfiles(normList);
-      const safeProf = normalizeProfile(profile || FAMILY_PROFILES[0]);
+      const safeProf = normalizeProfile(profile || normList[0]);
       setActiveProfile(safeProf);
       setReportsList(PRELOADED_REPORTS);
       try {
         localStorage.setItem('apnavaidya_active_profile_id', safeProf.id);
-        localStorage.removeItem('apnavaidya_custom_profiles');
       } catch (_) {}
     } else {
       const safeProf = normalizeProfile(profile || user);

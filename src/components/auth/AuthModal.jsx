@@ -148,18 +148,31 @@ export default function AuthModal({ onLogin }) {
     try {
       const res = await loginUserBackend({ identifier: loginIdentifier, password: loginPassword });
       if (res && res.success) {
-        // Find matching profile or default to Arjun
-        const matched = FAMILY_PROFILES.find(p => 
+        // Find matching profile from custom saved profiles or default mock profiles
+        let customList = [];
+        try {
+          const savedCustom = localStorage.getItem('apnavaidya_custom_profiles');
+          if (savedCustom) customList = JSON.parse(savedCustom);
+        } catch (_) {}
+
+        const matched = (customList && customList.length > 0 && customList.find(p => 
+          p.name.toLowerCase().includes(loginIdentifier.toLowerCase()) || 
+          p.id.toLowerCase().includes(loginIdentifier.toLowerCase())
+        )) || FAMILY_PROFILES.find(p => 
           p.name.toLowerCase().includes(loginIdentifier.toLowerCase()) || 
           p.id.toLowerCase().includes(loginIdentifier.toLowerCase())
         );
 
-        const isDemo = Boolean(matched);
+        const isDemo = Boolean(FAMILY_PROFILES.some(p => 
+          p.name.toLowerCase().includes(loginIdentifier.toLowerCase()) || 
+          p.id.toLowerCase().includes(loginIdentifier.toLowerCase())
+        ));
+
         const profileToUse = matched || {
           id: res.user.id || `user-${Date.now()}`,
           name: res.user.name,
           relationship: 'Self (Account Owner)',
-          age: res.user.age || 30,
+          age: (res.user.age !== undefined && res.user.age !== null && Number(res.user.age) > 0) ? Number(res.user.age) : 25,
           gender: res.user.gender || 'Male',
           bloodGroup: res.user.bloodGroup || 'B+',
           avatarColor: 'from-brand-green-600 to-teal-700',

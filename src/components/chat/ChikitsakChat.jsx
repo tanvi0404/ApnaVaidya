@@ -57,10 +57,10 @@ export default function ChikitsakChat({
 
   const [messages, setMessages] = useState([createInitialGreeting(activeProfile, selectedLanguage)]);
 
-  // Reset greeting whenever active profile switches
+  // Reset greeting whenever active profile or age switches
   useEffect(() => {
     setMessages([createInitialGreeting(activeProfile, selectedLanguage)]);
-  }, [activeProfile.id]);
+  }, [activeProfile.id, activeProfile.age, selectedLanguage]);
 
   // Prompt suggestions
   const suggestedPrompts = (Number(activeProfile?.age) || 30) < 18 ? [

@@ -33,6 +33,9 @@ export default function LongevityView({ activeProfile }) {
   // Sync with Java 17 Backend
   React.useEffect(() => {
     let isMounted = true;
+    const freshMetrics = CALCULATE_LONGEVITY_METRICS(activeProfile);
+    setLongevityData(freshMetrics);
+
     calculateLongevityBackend({
       chronologicalAge: activeProfile.age || 35,
       systolicBp: 124,
@@ -57,7 +60,7 @@ export default function LongevityView({ activeProfile }) {
     }).catch(err => console.warn('Longevity client fallback:', err));
 
     return () => { isMounted = false; };
-  }, [activeProfile.id]);
+  }, [activeProfile.id, activeProfile.age]);
 
   const toggleScreeningStatus = (id) => {
     setScreenings(prev => prev.map(s => {

@@ -49,6 +49,22 @@ export default function ClinicalRiskCalculatorsView({ activeProfile }) {
     'crit-fbs': activeProfile.id === 'user-rajesh'
   });
 
+  // Sync calculator state when activeProfile updates
+  React.useEffect(() => {
+    if (activeProfile) {
+      if (activeProfile.age !== undefined && activeProfile.age !== null) {
+        setAscvdAge(activeProfile.age);
+        setIdrsAge(activeProfile.age);
+      }
+      setAscvdGender(activeProfile.gender === 'Female' ? 'Female' : 'Male');
+      setAscvdHasDiabetes(activeProfile.id === 'user-rajesh');
+      setMetabolicChecks(prev => ({
+        ...prev,
+        'crit-fbs': activeProfile.id === 'user-rajesh'
+      }));
+    }
+  }, [activeProfile.id, activeProfile.age, activeProfile.gender]);
+
   // Calculate local results
   const localAscvd = CALCULATE_ASCVD_RISK(
     ascvdAge,

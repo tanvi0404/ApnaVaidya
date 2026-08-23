@@ -44,7 +44,7 @@ export default function EditProfileModal({ isOpen, onClose, activeProfile, onUpd
       setFormData({
         name: activeProfile.name || '',
         relationship: activeProfile.relationship || 'Self (Account Owner)',
-        age: activeProfile.age || 30,
+        age: (activeProfile.age !== undefined && activeProfile.age !== null) ? activeProfile.age : '',
         gender: activeProfile.gender || 'Male',
         bloodGroup: activeProfile.bloodGroup || 'B+',
         weight: activeProfile.weight || '68 kg',

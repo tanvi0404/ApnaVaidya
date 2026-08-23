@@ -42,6 +42,17 @@ export default function VascularGlucoseView({ activeProfile }) {
   // Sync with Java Backend when inputs change
   React.useEffect(() => {
     let isMounted = true;
+    const currentLocal = CALCULATE_VASCULAR_AGE({
+      chronologicalAge: activeProfile.age || 32,
+      systolicBp: Number(systolicBp) || 120,
+      diastolicBp: Number(diastolicBp) || 80,
+      totalChol: Number(totalChol) || 200,
+      hdlChol: Number(hdlChol) || 50,
+      restingHr: Number(restingHr) || 70,
+      smoker: isSmoker
+    });
+    setVascularResult(currentLocal);
+
     calculateVascularBackend({
       chronologicalAge: activeProfile.age || 32,
       systolicBp: Number(systolicBp) || 120,
@@ -55,7 +66,7 @@ export default function VascularGlucoseView({ activeProfile }) {
         setVascularResult(res);
       }
     }).catch(() => {
-      if (isMounted) setVascularResult(localVasc);
+      if (isMounted) setVascularResult(currentLocal);
     });
     return () => { isMounted = false; };
   }, [systolicBp, diastolicBp, totalChol, hdlChol, restingHr, isSmoker, activeProfile.age]);
