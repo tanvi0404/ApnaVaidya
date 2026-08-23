@@ -1084,7 +1084,10 @@ public class ApnaVaidyaServer {
                     String lowerId = identifier.trim().toLowerCase();
 
                     // Check for Evaluator / Demo Profiles
-                    boolean isDemo = lowerId.equals("arjun") || lowerId.equals("rajesh") || lowerId.equals("sunita") || lowerId.equals("ananya") || lowerId.equals("demo") || lowerId.endsWith("@apnavaidya.in") || lowerId.equals("demo@apnavaidya.in");
+                    boolean isDemo = lowerId.equals("arjun") || lowerId.equals("rajesh") || lowerId.equals("sunita") || lowerId.equals("ananya") 
+                                  || lowerId.equals("demo") || lowerId.equals("demo@apnavaidya.in") 
+                                  || lowerId.equals("arjun.sharma@apnavaidya.in") || lowerId.equals("rajesh.sharma@apnavaidya.in") 
+                                  || lowerId.equals("sunita.sharma@apnavaidya.in") || lowerId.equals("ananya.sharma@apnavaidya.in");
                     if (isDemo) {
                         if (!AuthSecurityService.isDemoPasswordValid(password)) {
                             sendResponse(exchange, 401, "{\"error\":\"Invalid credentials. For demo accounts, use password 'Demo@123'.\"}");
@@ -1407,12 +1410,14 @@ public class ApnaVaidyaServer {
         }
         explain.append("}");
 
+        String textVal = res.getText() != null && !res.getText().isEmpty() ? res.getText() : (res.getContent() != null ? res.getContent() : "");
         return String.format(
-            "{\"id\":\"%s\",\"role\":\"%s\",\"content\":\"%s\",\"text\":\"%s\",\"isEmergency\":%b,\"citations\":%s,\"explainability\":%s}",
+            "{\"id\":\"%s\",\"role\":\"%s\",\"content\":\"%s\",\"text\":\"%s\",\"replyText\":\"%s\",\"isEmergency\":%b,\"citations\":%s,\"explainability\":%s}",
             res.getId(),
             res.getRole(),
-            escapeJson(res.getContent()),
-            escapeJson(res.getText()),
+            escapeJson(textVal),
+            escapeJson(textVal),
+            escapeJson(textVal),
             res.isEmergency(),
             citations.toString(),
             explain.toString()

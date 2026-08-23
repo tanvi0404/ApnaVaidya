@@ -10,7 +10,8 @@
     "build:server": "node scripts/build-server.js",
     "test": "vitest run",
     "test:server": "node scripts/test-server.js",
-    "test:all": "npm run test:server && vitest run",
+    "test:e2e": "node scripts/e2e-api-test.js",
+    "test:all": "npm run test:server && vitest run && npm run test:e2e",
     "start:server": "node scripts/run-server.js",
     "build:all": "npm run build:server && npm run build"
   },
