@@ -20,14 +20,15 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
- * ApnaVaidya Enterprise Persistence & Cryptographic Vault Layer
- * Features:
- * 1. Strict PostgreSQL Connection Pool (Strictly capped at MAX_POOL_SIZE = 10, thread-safe, auto-recycling & validation)
- * 2. Mandatory PostgreSQL in production when DATABASE_URL is set (Throws critical startup exception if unreachable, NO silent fallback)
- * 3. Mandatory VAULT_ENCRYPTION_KEY in production with SHA-256 key derivation (Fails startup if missing in production)
- * 4. Robust URL-Decoded Credential Normalization for Render / Supabase / Neon / AWS RDS
- * 5. AES-256 GCM authenticated encryption at rest for sensitive health records and PII
- * 6. Zero-dependency file-backed JSON fallback exclusively for local development
+ * ApnaVaidya Enterprise Persistence & Cryptographic Vault Layer (v1.0.4-prod)
+ * Production Architecture:
+ * 1. Strict PostgreSQL Connection Pool: Capped at MAX_POOL_SIZE = 10; throws SQLException on timeout (no unmetered fallback)
+ * 2. Mandatory PostgreSQL in Production: Throws RuntimeException and terminates startup on connection/migration failure
+ * 3. Mandatory Externalized Secrets: Fails startup with IllegalStateException if VAULT_ENCRYPTION_KEY is missing
+ * 4. Zero Hardcoded Cryptographic Keys: All static secrets removed; SHA-256 derivation on externalized environment keys
+ * 5. Robust URL-Decoded Credential Normalization for Render / Supabase / AWS RDS
+ * 6. AES-256 GCM authenticated field encryption for sensitive patient health records
+ * 7. Local JSON file-backed storage strictly restricted to local development (DATABASE_URL absent)
  */
 public class DatabaseManager {
 
