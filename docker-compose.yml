@@ -36,9 +36,9 @@ services:
       - NODE_ENV=production
       - PORT=8080
       - DATABASE_URL=postgresql://apnavaidya_user:apnavaidya_dev_password@postgres:5432/apnavaidya
-      - JWT_SECRET=ApnaVaidya_2026_Enterprise_Dev_Secret_98234!
-      - VAULT_ENCRYPTION_KEY=ApnaVaidya_2026_Enterprise_AES256_Key_98234!
-      - ALLOWED_ORIGINS=http://localhost:5173,http://localhost:3000,https://apnavaidya.vercel.app
+      - JWT_SECRET=${JWT_SECRET}
+      - VAULT_ENCRYPTION_KEY=${VAULT_ENCRYPTION_KEY}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:5173,http://localhost:3000,https://apnavaidya.vercel.app}
     volumes:
       - apnavaidya_data:/app/server/data
 
