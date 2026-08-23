@@ -81,19 +81,39 @@ public class MedicationService {
     }
 
     public boolean deleteMedication(String id) {
-        return medicationRepo.deleteById(id);
+        return deleteMedication(id, null);
     }
 
-    public boolean deleteMedication(String id, String profileId) {
-        return medicationRepo.deleteById(id, profileId);
+    public boolean deleteMedication(String id, String authUserId) {
+        if (id == null || id.isEmpty()) return false;
+        Optional<MedicationItem> opt = medicationRepo.findById(id);
+        if (opt.isPresent()) {
+            String profileId = opt.get().getProfileId();
+            if (authUserId == null || profileId.equals(authUserId) || new com.apnavaidya.storage.repository.FamilyProfileRepository().findById(profileId, authUserId).isPresent()) {
+                return medicationRepo.deleteById(id);
+            }
+        }
+        return false;
     }
 
     public boolean toggleMedicationTaken(String id) {
-        return medicationRepo.toggleTakenToday(id);
+        return toggleMedicationStatus(id, null);
     }
 
     public boolean toggleMedicationStatus(String id) {
-        return medicationRepo.toggleTakenToday(id);
+        return toggleMedicationStatus(id, null);
+    }
+
+    public boolean toggleMedicationStatus(String id, String authUserId) {
+        if (id == null || id.isEmpty()) return false;
+        Optional<MedicationItem> opt = medicationRepo.findById(id);
+        if (opt.isPresent()) {
+            String profileId = opt.get().getProfileId();
+            if (authUserId == null || profileId.equals(authUserId) || new com.apnavaidya.storage.repository.FamilyProfileRepository().findById(profileId, authUserId).isPresent()) {
+                return medicationRepo.toggleTakenToday(id);
+            }
+        }
+        return false;
     }
 
     /**

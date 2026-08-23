@@ -153,6 +153,46 @@ public class MedicationRepository {
     }
 
     public Optional<MedicationItem> findById(String id) {
+        if (id == null || id.isEmpty()) return Optional.empty();
+        if (db.isPostgres()) {
+            Connection conn = null;
+            try {
+                conn = db.getConnection();
+                if (conn != null) {
+                    try (PreparedStatement ps = conn.prepareStatement("SELECT * FROM medications WHERE id = ?")) {
+                        ps.setString(1, id.trim());
+                        try (ResultSet rs = ps.executeQuery()) {
+                            if (rs.next()) {
+                                MedicationItem item = new MedicationItem(
+                                    rs.getString("id"),
+                                    rs.getString("profile_id"),
+                                    rs.getString("name"),
+                                    rs.getString("generic_name"),
+                                    rs.getString("dosage"),
+                                    rs.getString("frequency"),
+                                    rs.getString("timing"),
+                                    rs.getString("food_instruction"),
+                                    rs.getString("prescribed_for"),
+                                    rs.getString("doctor_name"),
+                                    rs.getInt("remaining_days"),
+                                    rs.getInt("total_pills"),
+                                    rs.getInt("remaining_pills"),
+                                    rs.getBoolean("taken_today")
+                                );
+                                memoryIndex.put(id, item);
+                                return Optional.of(item);
+                            }
+                            return Optional.empty();
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                System.err.println("Postgres medications findById error: " + e.getMessage());
+                throw new RuntimeException("Failed to query medication from PostgreSQL", e);
+            } finally {
+                db.releaseConnection(conn);
+            }
+        }
         return Optional.ofNullable(memoryIndex.get(id));
     }
 

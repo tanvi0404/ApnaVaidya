@@ -138,6 +138,41 @@ public class MedicalReportRepository {
     }
 
     public Optional<MedicalReport> findById(String id) {
+        if (id == null || id.isEmpty()) return Optional.empty();
+        if (db.isPostgres()) {
+            Connection conn = null;
+            try {
+                conn = db.getConnection();
+                if (conn != null) {
+                    try (PreparedStatement ps = conn.prepareStatement("SELECT * FROM medical_reports WHERE id = ?")) {
+                        ps.setString(1, id.trim());
+                        try (ResultSet rs = ps.executeQuery()) {
+                            if (rs.next()) {
+                                MedicalReport rep = new MedicalReport(
+                                    rs.getString("id"),
+                                    rs.getString("profile_id"),
+                                    rs.getString("title"),
+                                    rs.getString("lab_name"),
+                                    rs.getString("test_date"),
+                                    rs.getString("category"),
+                                    rs.getString("ocr_confidence"),
+                                    rs.getString("summary_text"),
+                                    Collections.emptyList()
+                                );
+                                memoryIndex.put(id, rep);
+                                return Optional.of(rep);
+                            }
+                            return Optional.empty();
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                System.err.println("Postgres reports findById error: " + e.getMessage());
+                throw new RuntimeException("Failed to query medical report from PostgreSQL", e);
+            } finally {
+                db.releaseConnection(conn);
+            }
+        }
         return Optional.ofNullable(memoryIndex.get(id));
     }
 

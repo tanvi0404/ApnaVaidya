@@ -669,7 +669,7 @@ public class ApnaVaidyaServer {
                         sendResponse(exchange, 201, medicationToJson(item));
                     } else {
                         // Toggle adherence status
-                        boolean success = medicationService.toggleMedicationStatus(medId);
+                        boolean success = medicationService.toggleMedicationStatus(medId, authUserId);
                         sendResponse(exchange, 200, "{\"success\":" + success + ",\"medId\":\"" + escapeJson(medId) + "\"}");
                     }
                 } else if ("DELETE".equalsIgnoreCase(method)) {
@@ -686,7 +686,7 @@ public class ApnaVaidyaServer {
                         sendResponse(exchange, 400, "{\"error\":\"Medication id is required for deletion\"}");
                         return;
                     }
-                    boolean deleted = medicationService.deleteMedication(id);
+                    boolean deleted = medicationService.deleteMedication(id, authUserId);
                     sendResponse(exchange, 200, "{\"success\":" + deleted + ",\"id\":\"" + escapeJson(id) + "\"}");
                 } else {
                     sendResponse(exchange, 405, "{\"error\":\"Method Not Allowed\"}");
@@ -1273,17 +1273,19 @@ public class ApnaVaidyaServer {
 
         String allowOrigin = "http://localhost:5173"; // Safe default dev origin
         if (envOrigins != null && !envOrigins.trim().isEmpty()) {
+            boolean matched = false;
             String[] allowed = envOrigins.split(",");
             for (String a : allowed) {
                 if (origin != null && (a.trim().equalsIgnoreCase(origin.trim()) || "*".equals(a.trim()))) {
                     allowOrigin = origin;
+                    matched = true;
                     break;
                 }
             }
-            if (origin != null && origin.endsWith(".vercel.app")) {
+            if (!matched && origin != null && origin.startsWith("https://apnavaidya") && origin.endsWith(".vercel.app")) {
                 allowOrigin = origin;
             }
-        } else if (origin != null && (origin.endsWith(".vercel.app") || origin.startsWith("http://localhost:"))) {
+        } else if (origin != null && (origin.startsWith("http://localhost:") || (origin.startsWith("https://apnavaidya") && origin.endsWith(".vercel.app")))) {
             allowOrigin = origin;
         }
 

@@ -108,10 +108,18 @@ public class ReportService {
     }
 
     public boolean deleteReport(String id) {
-        return reportRepo.deleteById(id);
+        return deleteReport(id, null);
     }
 
-    public boolean deleteReport(String id, String profileId) {
-        return reportRepo.deleteById(id, profileId);
+    public boolean deleteReport(String id, String authUserId) {
+        if (id == null || id.isEmpty()) return false;
+        Optional<MedicalReport> opt = reportRepo.findById(id);
+        if (opt.isPresent()) {
+            String profileId = opt.get().getProfileId();
+            if (authUserId == null || profileId.equals(authUserId) || new com.apnavaidya.storage.repository.FamilyProfileRepository().findById(profileId, authUserId).isPresent()) {
+                return reportRepo.deleteById(id);
+            }
+        }
+        return false;
     }
 }

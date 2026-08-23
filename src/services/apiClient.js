@@ -547,15 +547,18 @@ export async function loginUserBackend(credentials) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(credentials)
     });
+    const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      const errData = await res.json().catch(() => ({}));
-      throw new Error(errData.error || `HTTP error ${res.status}`);
+      return { success: false, error: data.error || `HTTP error ${res.status}` };
     }
-    return await res.json();
+    return data;
   } catch (err) {
-    console.warn('Auth login backend fallback:', err.message);
-    // Offline/fallback authentication logic
-    const { identifier, password } = credentials;
+    console.warn('Auth login backend unreachable:', err.message);
+    if (CONFIGURED_API_URL) {
+      return { success: false, error: 'Authentication service unreachable. Please check your network connection.' };
+    }
+    // Offline local development fallback logic
+    const { identifier } = credentials;
     return {
       success: true,
       token: `jwt_offline_${Date.now()}`,
@@ -577,14 +580,17 @@ export async function registerUserBackend(userData) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(userData)
     });
+    const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      const errData = await res.json().catch(() => ({}));
-      throw new Error(errData.error || `HTTP error ${res.status}`);
+      return { success: false, error: data.error || `HTTP error ${res.status}` };
     }
-    return await res.json();
+    return data;
   } catch (err) {
-    console.warn('Auth register backend fallback:', err.message);
-    // Offline/fallback registration
+    console.warn('Auth register backend unreachable:', err.message);
+    if (CONFIGURED_API_URL) {
+      return { success: false, error: 'Registration service unreachable. Please check your network connection.' };
+    }
+    // Offline local development fallback
     const newId = `user-reg-${Date.now()}`;
     return {
       success: true,
