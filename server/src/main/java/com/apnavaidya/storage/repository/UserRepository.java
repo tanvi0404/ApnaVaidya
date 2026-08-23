@@ -78,31 +78,39 @@ public class UserRepository {
 
     private synchronized void loadAll() {
         if (db.isPostgres()) {
-            try (Connection conn = db.getConnection();
-                 PreparedStatement ps = conn.prepareStatement("SELECT * FROM users");
-                 ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    String id = rs.getString("id");
-                    UserEntity user = new UserEntity(
-                        id,
-                        rs.getString("name"),
-                        rs.getString("email"),
-                        rs.getString("mobile"),
-                        DatabaseManager.decryptField(rs.getString("password_hash")),
-                        DatabaseManager.decryptField(rs.getString("salt")),
-                        rs.getInt("age"),
-                        rs.getString("gender"),
-                        rs.getString("place"),
-                        DatabaseManager.decryptField(rs.getString("address")),
-                        DatabaseManager.decryptField(rs.getString("blood_group")),
-                        rs.getString("diet_preference"),
-                        rs.getString("created_at")
-                    );
-                    memoryIndex.put(id, user);
+            Connection conn = null;
+            try {
+                conn = db.getConnection();
+                if (conn != null) {
+                    try (PreparedStatement ps = conn.prepareStatement("SELECT * FROM users");
+                         ResultSet rs = ps.executeQuery()) {
+                        while (rs.next()) {
+                            String id = rs.getString("id");
+                            UserEntity user = new UserEntity(
+                                id,
+                                rs.getString("name"),
+                                rs.getString("email"),
+                                rs.getString("mobile"),
+                                DatabaseManager.decryptField(rs.getString("password_hash")),
+                                DatabaseManager.decryptField(rs.getString("salt")),
+                                rs.getInt("age"),
+                                rs.getString("gender"),
+                                rs.getString("place"),
+                                DatabaseManager.decryptField(rs.getString("address")),
+                                DatabaseManager.decryptField(rs.getString("blood_group")),
+                                rs.getString("diet_preference"),
+                                rs.getString("created_at")
+                            );
+                            memoryIndex.put(id, user);
+                        }
+                        return;
+                    }
                 }
-                return;
             } catch (Exception e) {
-                System.err.println("Postgres users load error: " + e.getMessage() + ", falling back to local storage.");
+                System.err.println("Postgres users load error: " + e.getMessage());
+                throw new RuntimeException("Failed to load users from PostgreSQL production database", e);
+            } finally {
+                db.releaseConnection(conn);
             }
         }
 
@@ -182,30 +190,39 @@ public class UserRepository {
         String encBloodGroup = DatabaseManager.encryptField(user.getBloodGroup());
 
         if (db.isPostgres()) {
-            try (Connection conn = db.getConnection();
-                 PreparedStatement ps = conn.prepareStatement(
-                     "INSERT INTO users (id, name, email, mobile, password_hash, salt, age, gender, place, address, blood_group, diet_preference, created_at) "
-                     + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
-                     + "ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, email = EXCLUDED.email, mobile = EXCLUDED.mobile, "
-                     + "password_hash = EXCLUDED.password_hash, salt = EXCLUDED.salt, age = EXCLUDED.age, gender = EXCLUDED.gender, "
-                     + "place = EXCLUDED.place, address = EXCLUDED.address, blood_group = EXCLUDED.blood_group, diet_preference = EXCLUDED.diet_preference"
-                 )) {
-                ps.setString(1, user.getId());
-                ps.setString(2, user.getName());
-                ps.setString(3, user.getEmail());
-                ps.setString(4, user.getMobile());
-                ps.setString(5, encHash);
-                ps.setString(6, encSalt);
-                ps.setInt(7, user.getAge());
-                ps.setString(8, user.getGender());
-                ps.setString(9, user.getPlace());
-                ps.setString(10, encAddress);
-                ps.setString(11, encBloodGroup);
-                ps.setString(12, user.getDietPreference());
-                ps.setString(13, user.getCreatedAt());
-                ps.executeUpdate();
+            Connection conn = null;
+            try {
+                conn = db.getConnection();
+                if (conn != null) {
+                    try (PreparedStatement ps = conn.prepareStatement(
+                        "INSERT INTO users (id, name, email, mobile, password_hash, salt, age, gender, place, address, blood_group, diet_preference, created_at) "
+                        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+                        + "ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, email = EXCLUDED.email, mobile = EXCLUDED.mobile, "
+                        + "password_hash = EXCLUDED.password_hash, salt = EXCLUDED.salt, age = EXCLUDED.age, gender = EXCLUDED.gender, "
+                        + "place = EXCLUDED.place, address = EXCLUDED.address, blood_group = EXCLUDED.blood_group, diet_preference = EXCLUDED.diet_preference"
+                    )) {
+                        ps.setString(1, user.getId());
+                        ps.setString(2, user.getName());
+                        ps.setString(3, user.getEmail());
+                        ps.setString(4, user.getMobile());
+                        ps.setString(5, encHash);
+                        ps.setString(6, encSalt);
+                        ps.setInt(7, user.getAge());
+                        ps.setString(8, user.getGender());
+                        ps.setString(9, user.getPlace());
+                        ps.setString(10, encAddress);
+                        ps.setString(11, encBloodGroup);
+                        ps.setString(12, user.getDietPreference());
+                        ps.setString(13, user.getCreatedAt());
+                        ps.executeUpdate();
+                    }
+                    return user;
+                }
             } catch (Exception e) {
                 System.err.println("Postgres save user error: " + e.getMessage());
+                throw new RuntimeException("Failed to save user in PostgreSQL", e);
+            } finally {
+                db.releaseConnection(conn);
             }
         }
 

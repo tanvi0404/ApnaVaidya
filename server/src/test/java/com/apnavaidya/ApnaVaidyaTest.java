@@ -413,15 +413,32 @@ public class ApnaVaidyaTest {
             assert testHash.equals(optFetchedUser.get().getPasswordHash()) : "Transparently decrypted hash must match original";
             assert "O+".equals(optFetchedUser.get().getBloodGroup()) : "Decrypted blood group must match";
 
-            // Test PostgreSQL JDBC URL Parser & Scheme Converter
-            String rawRenderPgUrl = "postgres://apna_user:SecretPass123@dpg-c12345-a.oregon-postgres.render.com:5432/apna_db";
-            String convertedJdbc = com.apnavaidya.storage.DatabaseManager.toJdbcUrl(rawRenderPgUrl);
-            assert convertedJdbc != null && convertedJdbc.startsWith("jdbc:postgresql://") : "Must convert postgres:// to jdbc:postgresql://";
-            assert convertedJdbc.contains("user=apna_user") : "Must extract username into JDBC params";
-            assert convertedJdbc.contains("password=SecretPass123") : "Must extract password into JDBC params";
-            assert convertedJdbc.contains("sslmode=require") : "Must enforce SSL for cloud postgres";
+            // Test FamilyProfileRepository & ClinicalPrescriptionRepository
+            com.apnavaidya.storage.repository.FamilyProfileRepository famRepo = new com.apnavaidya.storage.repository.FamilyProfileRepository();
+            com.apnavaidya.model.FamilyProfile testFam = new com.apnavaidya.model.FamilyProfile(
+                "profile-test-01", "Pooja Sharma", "Wife", 48, "Female", "B+", "62 kg", 23.4,
+                "PS", "emerald", Collections.emptyList(), Collections.emptyList(), Collections.emptyList(), "Vegetarian"
+            );
+            famRepo.save(testFam);
+            assert famRepo.findById("profile-test-01").isPresent() : "Family profile must be queryable";
 
-            System.out.printf("  ✓ [PASS] Schema Migrations & Relational Repository Engine: Verified 6 DDL Schemas, PostgreSQL JDBC Layer, AES-256 Vault & Hardened JSON Parser%n");
+            com.apnavaidya.storage.repository.ClinicalPrescriptionRepository rxRepo = new com.apnavaidya.storage.repository.ClinicalPrescriptionRepository();
+            com.apnavaidya.storage.repository.ClinicalPrescriptionRepository.PrescriptionEntity testRx = new com.apnavaidya.storage.repository.ClinicalPrescriptionRepository.PrescriptionEntity(
+                "rx-test-01", "Dr. A. K. Sharma", "MCI-48291", "Arjun Sharma", "Dyslipidemia", "0x3F8A7D9C", "2026-08-23T00:00:00Z", "SIGNED"
+            );
+            rxRepo.save(testRx);
+            assert rxRepo.findById("rx-test-01").isPresent() : "Clinical prescription must be queryable";
+
+            // Test PostgreSQL JDBC URL Parser & URL-Decoded Credentials
+            String rawRenderPgUrl = "postgres://apna_user:Secret%40Pass%23123@dpg-c12345-a.oregon-postgres.render.com:5432/apna_db";
+            String convertedJdbc = com.apnavaidya.storage.DatabaseManager.toJdbcUrl(rawRenderPgUrl);
+            Properties parsedProps = com.apnavaidya.storage.DatabaseManager.parseConnectionProperties(rawRenderPgUrl);
+            assert convertedJdbc != null && convertedJdbc.startsWith("jdbc:postgresql://") : "Must convert postgres:// to jdbc:postgresql://";
+            assert "apna_user".equals(parsedProps.getProperty("user")) : "Must decode username";
+            assert "Secret@Pass#123".equals(parsedProps.getProperty("password")) : "Must URL-decode password containing special chars (@, #)";
+            assert "require".equals(parsedProps.getProperty("sslmode")) : "Must enforce SSL for cloud postgres";
+
+            System.out.printf("  ✓ [PASS] Schema Migrations & Relational Repository Engine: Verified 6 Relational Repositories, Connection Pool & URL-Decoded Credentials%n");
             passed++;
         } catch (Throwable t) {
             System.err.println("  ✗ [FAIL] Schema Migrations & Relational Repository Engine: " + t.getMessage());

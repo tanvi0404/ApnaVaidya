@@ -5,36 +5,45 @@ import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import java.io.*;
 import java.net.URI;
+import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.sql.*;
 import java.util.*;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
  * ApnaVaidya Enterprise Persistence & Cryptographic Vault Layer
  * Features:
- * 1. Hybrid Persistence: Automated PostgreSQL JDBC layer when DATABASE_URL is set,
- *    with seamless zero-dependency file-backed JSON fallback for local development.
- * 2. High-concurrency ReentrantReadWriteLock table locking for file storage.
- * 3. AES-256 GCM authenticated encryption at rest for sensitive health records and PII.
- * 4. Verifiable SHA-256 append-only immutable audit trail.
- * 5. Externalized VAULT_ENCRYPTION_KEY and DATABASE_URL environment configuration.
+ * 1. Real Thread-Safe PostgreSQL Connection Pool (Max 10 connections, auto-recycling & validation)
+ * 2. Robust URL Normalization & URL-Decoded Credential Handling for Render / Supabase / Neon / AWS RDS
+ * 3. AES-256 GCM authenticated encryption at rest for sensitive health records and PII (derived via SHA-256)
+ * 4. Zero-dependency file-backed JSON fallback for local development when DATABASE_URL is not set
  */
 public class DatabaseManager {
 
     private static final String DATA_DIR = "server/data";
     private static final int GCM_TAG_LENGTH = 128;
     private static final int GCM_IV_LENGTH = 12;
+    private static final int MAX_POOL_SIZE = 10;
 
     private static DatabaseManager instance;
     private final Path dataPath;
     private final ConcurrentHashMap<String, ReentrantReadWriteLock> tableLocks = new ConcurrentHashMap<>();
-    private final String dbUrl;
+    
+    // PostgreSQL Connection Pooling
     private boolean postgresConnected = false;
+    private String cleanJdbcUrl = null;
+    private Properties dbProps = null;
+    private final BlockingQueue<Connection> connectionPool = new LinkedBlockingQueue<>(MAX_POOL_SIZE);
+    private final AtomicInteger currentPoolSize = new AtomicInteger(0);
 
     private DatabaseManager() {
         this.dataPath = Paths.get(DATA_DIR);
@@ -46,19 +55,30 @@ public class DatabaseManager {
             System.err.println("Warning: Could not create data directory: " + e.getMessage());
         }
 
-        this.dbUrl = System.getenv("DATABASE_URL");
-        if (this.dbUrl != null && !this.dbUrl.trim().isEmpty()) {
-            try (Connection conn = createDirectConnection(this.dbUrl)) {
-                if (conn != null && !conn.isClosed()) {
+        String dbUrl = System.getenv("DATABASE_URL");
+        if (dbUrl != null && !dbUrl.trim().isEmpty()) {
+            try {
+                this.dbProps = parseConnectionProperties(dbUrl);
+                this.cleanJdbcUrl = toJdbcUrl(dbUrl);
+
+                // Pre-warm initial pool connection to verify database connectivity
+                try {
+                    Class.forName("org.postgresql.Driver");
+                } catch (ClassNotFoundException ignored) {}
+
+                Connection initialConn = DriverManager.getConnection(this.cleanJdbcUrl, this.dbProps);
+                if (initialConn != null && !initialConn.isClosed()) {
                     this.postgresConnected = true;
-                    System.out.println("🐘 DatabaseManager: Successfully connected to PostgreSQL production database.");
+                    connectionPool.offer(initialConn);
+                    currentPoolSize.set(1);
+                    System.out.println("🐘 DatabaseManager: Real PostgreSQL Connection Pool initialized (Pool Capacity: " + MAX_POOL_SIZE + ").");
                 }
             } catch (Exception e) {
                 System.err.println("⚠️ DatabaseManager notice: PostgreSQL connection failed (" + e.getMessage() + "). Operating in local JSON fallback mode.");
                 this.postgresConnected = false;
             }
         } else {
-            System.out.println("📦 DatabaseManager: DATABASE_URL not set. Running in local JSON storage mode.");
+            System.out.println("📦 DatabaseManager: DATABASE_URL not set. Running in local JSON storage mode (server/data/*.json).");
         }
     }
 
@@ -73,18 +93,73 @@ public class DatabaseManager {
         return postgresConnected;
     }
 
+    /**
+     * Borrow a validated connection from the connection pool
+     */
     public Connection getConnection() throws SQLException {
-        if (!postgresConnected || dbUrl == null) return null;
-        return createDirectConnection(dbUrl);
+        if (!postgresConnected || cleanJdbcUrl == null) return null;
+
+        Connection conn = connectionPool.poll();
+        if (conn != null) {
+            try {
+                if (!conn.isClosed() && conn.isValid(2)) {
+                    return conn;
+                }
+            } catch (SQLException ignored) {}
+            currentPoolSize.decrementAndGet();
+        }
+
+        // If pool is below capacity, allocate new connection
+        if (currentPoolSize.get() < MAX_POOL_SIZE) {
+            currentPoolSize.incrementAndGet();
+            try {
+                return DriverManager.getConnection(cleanJdbcUrl, dbProps);
+            } catch (SQLException e) {
+                currentPoolSize.decrementAndGet();
+                throw e;
+            }
+        }
+
+        // Wait briefly for a connection to return to the pool
+        try {
+            conn = connectionPool.poll(3, TimeUnit.SECONDS);
+            if (conn != null && !conn.isClosed() && conn.isValid(2)) {
+                return conn;
+            }
+            return DriverManager.getConnection(cleanJdbcUrl, dbProps);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new SQLException("Database connection acquisition interrupted", e);
+        }
     }
 
     /**
-     * Converts generic PostgreSQL URIs (e.g., postgres://user:pass@host:port/db) to JDBC URLs
+     * Return a connection back to the connection pool
+     */
+    public void releaseConnection(Connection conn) {
+        if (conn != null && postgresConnected) {
+            try {
+                if (!conn.isClosed() && conn.isValid(2) && connectionPool.size() < MAX_POOL_SIZE) {
+                    connectionPool.offer(conn);
+                    return;
+                }
+                conn.close();
+            } catch (SQLException ignored) {}
+            currentPoolSize.decrementAndGet();
+        }
+    }
+
+    /**
+     * Converts generic PostgreSQL URIs to standard JDBC URLs and extracts properties
      */
     public static String toJdbcUrl(String rawUrl) {
         if (rawUrl == null || rawUrl.trim().isEmpty()) return null;
         String trimmed = rawUrl.trim();
-        if (trimmed.startsWith("jdbc:")) return trimmed;
+        if (trimmed.startsWith("jdbc:")) {
+            // Strip credentials if present in JDBC URL query string to prevent duplicate param issues
+            int queryIdx = trimmed.indexOf("?");
+            return (queryIdx > 0) ? trimmed.substring(0, queryIdx) : trimmed;
+        }
 
         if (trimmed.startsWith("postgres://") || trimmed.startsWith("postgresql://")) {
             try {
@@ -92,28 +167,10 @@ public class DatabaseManager {
                 URI uri = URI.create(normalized);
                 String host = uri.getHost();
                 int port = uri.getPort() > 0 ? uri.getPort() : 5432;
-                String path = uri.getPath(); // e.g. /apnavaidya
-                if (path == null || path.isEmpty()) path = "/apnavaidya";
+                String path = uri.getPath();
+                if (path == null || path.isEmpty() || path.equals("/")) path = "/apnavaidya";
 
-                StringBuilder jdbc = new StringBuilder("jdbc:postgresql://").append(host).append(":").append(port).append(path);
-                String userInfo = uri.getUserInfo();
-                List<String> queryParams = new ArrayList<>();
-
-                if (userInfo != null && userInfo.contains(":")) {
-                    String[] parts = userInfo.split(":", 2);
-                    queryParams.add("user=" + parts[0]);
-                    queryParams.add("password=" + parts[1]);
-                }
-
-                // Cloud hosting (Render, Supabase, Neon, AWS) typically requires SSL
-                if (host != null && !host.equals("localhost") && !host.equals("127.0.0.1") && !host.equals("postgres")) {
-                    queryParams.add("sslmode=require");
-                }
-
-                if (!queryParams.isEmpty()) {
-                    jdbc.append("?").append(String.join("&", queryParams));
-                }
-                return jdbc.toString();
+                return "jdbc:postgresql://" + host + ":" + port + path;
             } catch (Exception e) {
                 return "jdbc:" + trimmed;
             }
@@ -121,26 +178,79 @@ public class DatabaseManager {
         return "jdbc:" + trimmed;
     }
 
+    public static Properties parseConnectionProperties(String rawUrl) {
+        Properties props = new Properties();
+        if (rawUrl == null || rawUrl.trim().isEmpty()) return props;
+        String trimmed = rawUrl.trim();
+
+        try {
+            if (trimmed.startsWith("postgres://") || trimmed.startsWith("postgresql://")) {
+                String normalized = trimmed.replaceFirst("^postgres(ql)?://", "http://");
+                URI uri = URI.create(normalized);
+                String userInfo = uri.getUserInfo();
+                if (userInfo != null && userInfo.contains(":")) {
+                    String[] parts = userInfo.split(":", 2);
+                    props.setProperty("user", URLDecoder.decode(parts[0], StandardCharsets.UTF_8));
+                    props.setProperty("password", URLDecoder.decode(parts[1], StandardCharsets.UTF_8));
+                }
+
+                String host = uri.getHost();
+                if (host != null && !host.equals("localhost") && !host.equals("127.0.0.1") && !host.equals("postgres")) {
+                    props.setProperty("sslmode", "require");
+                }
+
+                String rawQuery = uri.getRawQuery();
+                if (rawQuery != null && !rawQuery.isEmpty()) {
+                    String[] params = rawQuery.split("&");
+                    for (String p : params) {
+                        String[] kv = p.split("=", 2);
+                        if (kv.length == 2) {
+                            props.setProperty(URLDecoder.decode(kv[0], StandardCharsets.UTF_8), URLDecoder.decode(kv[1], StandardCharsets.UTF_8));
+                        }
+                    }
+                }
+            } else if (trimmed.startsWith("jdbc:postgresql://")) {
+                int queryIdx = trimmed.indexOf("?");
+                if (queryIdx > 0) {
+                    String query = trimmed.substring(queryIdx + 1);
+                    String[] params = query.split("&");
+                    for (String p : params) {
+                        String[] kv = p.split("=", 2);
+                        if (kv.length == 2) {
+                            props.setProperty(kv[0], kv[1]);
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Notice: URL properties parsing: " + e.getMessage());
+        }
+        return props;
+    }
+
     public static Connection createDirectConnection(String rawUrl) throws SQLException {
         String jdbcUrl = toJdbcUrl(rawUrl);
+        Properties props = parseConnectionProperties(rawUrl);
         try {
-            // Explicitly load driver class if available in classpath
             Class.forName("org.postgresql.Driver");
         } catch (ClassNotFoundException ignored) {}
-        return DriverManager.getConnection(jdbcUrl);
+        return DriverManager.getConnection(jdbcUrl, props);
     }
 
     /**
-     * Externalized 256-bit AES Vault Key derived via SHA-256
+     * Externalized 256-bit AES Vault Key derived deterministically via SHA-256
      */
     private static byte[] getEncryptionKeyBytes() {
         String envKey = System.getenv("VAULT_ENCRYPTION_KEY");
-        String secret = (envKey != null && !envKey.trim().isEmpty()) 
-            ? envKey.trim() 
-            : "ApnaVaidya_2026_Enterprise_AES256_Vault_Key_Production_98234!";
+        if (envKey == null || envKey.trim().isEmpty()) {
+            if ("production".equalsIgnoreCase(System.getenv("NODE_ENV")) || System.getenv("RENDER") != null) {
+                System.err.println("⚠️ SECURITY ALERT: VAULT_ENCRYPTION_KEY is not configured in production environment variables!");
+            }
+            envKey = "ApnaVaidya_2026_Enterprise_AES256_Vault_Key_Production_98234!";
+        }
         try {
             MessageDigest sha = MessageDigest.getInstance("SHA-256");
-            return sha.digest(secret.getBytes(StandardCharsets.UTF_8));
+            return sha.digest(envKey.trim().getBytes(StandardCharsets.UTF_8));
         } catch (Exception e) {
             return "ApnaVaidya2026AES256HealthVaultK".getBytes(StandardCharsets.UTF_8);
         }
@@ -151,15 +261,9 @@ public class DatabaseManager {
     }
 
     /**
-     * Read table data from PostgreSQL or local JSON file
+     * Read table data from local JSON file (local dev fallback)
      */
     public String loadTableData(String tableName) {
-        if (postgresConnected) {
-            String pgData = loadFromPostgres(tableName);
-            if (pgData != null) return pgData;
-        }
-
-        // File-backed fallback
         ReentrantReadWriteLock.ReadLock readLock = getLock(tableName).readLock();
         readLock.lock();
         try {
@@ -176,80 +280,10 @@ public class DatabaseManager {
         }
     }
 
-    private String loadFromPostgres(String tableName) {
-        try (Connection conn = getConnection()) {
-            if (conn == null) return null;
-            String sqlTable = mapToSqlTable(tableName);
-            try (Statement stmt = conn.createStatement();
-                 ResultSet rs = stmt.executeQuery("SELECT * FROM " + sqlTable)) {
-                ResultSetMetaData meta = rs.getMetaData();
-                int colCount = meta.getColumnCount();
-                StringBuilder sb = new StringBuilder("[");
-                boolean first = true;
-                while (rs.next()) {
-                    if (!first) sb.append(",");
-                    sb.append("{");
-                    for (int i = 1; i <= colCount; i++) {
-                        String colName = meta.getColumnLabel(i);
-                        String propName = snakeToCamel(colName);
-                        Object val = rs.getObject(i);
-                        sb.append("\"").append(propName).append("\":");
-                        if (val == null) {
-                            sb.append("null");
-                        } else if (val instanceof Number || val instanceof Boolean) {
-                            sb.append(val);
-                        } else {
-                            String s = val.toString();
-                            if ((s.startsWith("[") && s.endsWith("]")) || (s.startsWith("{") && s.endsWith("}"))) {
-                                sb.append(s);
-                            } else {
-                                sb.append("\"").append(JsonUtil.escapeJson(s)).append("\"");
-                            }
-                        }
-                        if (i < colCount) sb.append(",");
-                    }
-                    sb.append("}");
-                    first = false;
-                }
-                sb.append("]");
-                return sb.toString();
-            }
-        } catch (Exception e) {
-            System.err.println("Postgres read error on " + tableName + ": " + e.getMessage());
-            return null;
-        }
-    }
-
-    private String mapToSqlTable(String tableName) {
-        if ("reports".equalsIgnoreCase(tableName)) return "medical_reports";
-        return tableName;
-    }
-
-    private String snakeToCamel(String s) {
-        if (s == null) return "";
-        StringBuilder sb = new StringBuilder();
-        boolean nextUpper = false;
-        for (int i = 0; i < s.length(); i++) {
-            char c = s.charAt(i);
-            if (c == '_') {
-                nextUpper = true;
-            } else {
-                if (nextUpper) {
-                    sb.append(Character.toUpperCase(c));
-                    nextUpper = false;
-                } else {
-                    sb.append(c);
-                }
-            }
-        }
-        return sb.toString();
-    }
-
     /**
-     * Write table data with atomic swap and exclusive write lock (and sync to PostgreSQL if connected)
+     * Write table data with atomic swap and exclusive write lock (local dev fallback)
      */
     public void saveTableData(String tableName, String jsonData) {
-        // Local file persistence
         ReentrantReadWriteLock.WriteLock writeLock = getLock(tableName).writeLock();
         writeLock.lock();
         try {
@@ -273,7 +307,7 @@ public class DatabaseManager {
      */
     public static String encryptField(String plainText) {
         if (plainText == null || plainText.isEmpty()) return plainText;
-        if (plainText.startsWith("enc_aes256:")) return plainText; // already encrypted
+        if (plainText.startsWith("enc_aes256:")) return plainText;
         try {
             byte[] iv = new byte[GCM_IV_LENGTH];
             new SecureRandom().nextBytes(iv);

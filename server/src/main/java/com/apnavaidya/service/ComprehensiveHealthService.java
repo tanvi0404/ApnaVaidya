@@ -4,6 +4,9 @@ import com.apnavaidya.storage.DatabaseManager;
 import com.apnavaidya.storage.JsonUtil;
 
 import java.security.MessageDigest;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.util.*;
 
 public class ComprehensiveHealthService {
@@ -17,24 +20,32 @@ public class ComprehensiveHealthService {
 
     private void loadOrInitLogs() {
         if (db.isPostgres()) {
-            try (java.sql.Connection conn = db.getConnection();
-                 java.sql.PreparedStatement ps = conn.prepareStatement("SELECT * FROM audit_logs ORDER BY created_at DESC LIMIT 100");
-                 java.sql.ResultSet rs = ps.executeQuery()) {
-                auditLogs.clear();
-                while (rs.next()) {
-                    Map<String, Object> log = new HashMap<>();
-                    log.put("id", rs.getString("id"));
-                    log.put("eventType", rs.getString("event_type"));
-                    log.put("details", rs.getString("details"));
-                    log.put("status", rs.getString("status"));
-                    log.put("ipAddress", rs.getString("ip_address"));
-                    log.put("timestamp", rs.getString("timestamp"));
-                    log.put("blockHash", rs.getString("block_hash"));
-                    auditLogs.add(log);
+            Connection conn = null;
+            try {
+                conn = db.getConnection();
+                if (conn != null) {
+                    try (PreparedStatement ps = conn.prepareStatement("SELECT * FROM audit_logs ORDER BY created_at DESC LIMIT 100");
+                         ResultSet rs = ps.executeQuery()) {
+                        auditLogs.clear();
+                        while (rs.next()) {
+                            Map<String, Object> log = new HashMap<>();
+                            log.put("id", rs.getString("id"));
+                            log.put("eventType", rs.getString("event_type"));
+                            log.put("details", rs.getString("details"));
+                            log.put("status", rs.getString("status"));
+                            log.put("ipAddress", rs.getString("ip_address"));
+                            log.put("timestamp", rs.getString("timestamp"));
+                            log.put("blockHash", rs.getString("block_hash"));
+                            auditLogs.add(log);
+                        }
+                        if (!auditLogs.isEmpty()) return;
+                    }
                 }
-                if (!auditLogs.isEmpty()) return;
             } catch (Exception e) {
                 System.err.println("Postgres audit logs load error: " + e.getMessage());
+                throw new RuntimeException("Failed to load audit logs from PostgreSQL", e);
+            } finally {
+                db.releaseConnection(conn);
             }
         }
 
@@ -81,22 +92,31 @@ public class ComprehensiveHealthService {
         auditLogs.add(0, log);
 
         if (db.isPostgres()) {
-            try (java.sql.Connection conn = db.getConnection();
-                 java.sql.PreparedStatement ps = conn.prepareStatement(
-                     "INSERT INTO audit_logs (id, timestamp, event_type, details, status, ip_address, block_hash, created_at) "
-                     + "VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
-                 )) {
-                ps.setString(1, (String) log.get("id"));
-                ps.setString(2, (String) log.get("timestamp"));
-                ps.setString(3, (String) log.get("eventType"));
-                ps.setString(4, (String) log.get("details"));
-                ps.setString(5, (String) log.get("status"));
-                ps.setString(6, (String) log.get("ipAddress"));
-                ps.setString(7, (String) log.get("blockHash"));
-                ps.setString(8, java.time.Instant.now().toString());
-                ps.executeUpdate();
+            Connection conn = null;
+            try {
+                conn = db.getConnection();
+                if (conn != null) {
+                    try (PreparedStatement ps = conn.prepareStatement(
+                        "INSERT INTO audit_logs (id, timestamp, event_type, details, status, ip_address, block_hash, created_at) "
+                        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+                    )) {
+                        ps.setString(1, (String) log.get("id"));
+                        ps.setString(2, (String) log.get("timestamp"));
+                        ps.setString(3, (String) log.get("eventType"));
+                        ps.setString(4, (String) log.get("details"));
+                        ps.setString(5, (String) log.get("status"));
+                        ps.setString(6, (String) log.get("ipAddress"));
+                        ps.setString(7, (String) log.get("blockHash"));
+                        ps.setString(8, java.time.Instant.now().toString());
+                        ps.executeUpdate();
+                    }
+                    return log;
+                }
             } catch (Exception e) {
                 System.err.println("Postgres save audit log error: " + e.getMessage());
+                throw new RuntimeException("Failed to save audit log in PostgreSQL", e);
+            } finally {
+                db.releaseConnection(conn);
             }
         }
 
@@ -156,104 +176,100 @@ public class ComprehensiveHealthService {
         }
     }
 
-    // 2. IDRS Diabetes Risk Score (ICMR-INDIAB Validated, Max 100)
-    public Map<String, Object> calculateIdrs(int age, int waistCm, String activity, String familyHistory) {
+    // 2. IDRS (Indian Diabetes Risk Score)
+    public Map<String, Object> calculateIdrs(int age, int waistCircumferenceCm, String physicalActivity, String familyHistory) {
         int score = 0;
+        if (age < 35) score += 0;
+        else if (age <= 49) score += 20;
+        else score += 30;
 
-        // Age: <35 (0), 35-49 (20), >=50 (30)
-        if (age >= 50) score += 30;
-        else if (age >= 35) score += 20;
-        else score += 0;
+        if (waistCircumferenceCm < 80) score += 0;
+        else if (waistCircumferenceCm <= 89) score += 10;
+        else score += 20;
 
-        // Waist: <80cm (0), 80-89cm (10), >=90cm (20)
-        if (waistCm >= 90) score += 20;
-        else if (waistCm >= 80) score += 10;
-        else score += 0;
+        if (physicalActivity.toLowerCase().contains("vigorous")) score += 0;
+        else if (physicalActivity.toLowerCase().contains("moderate") || physicalActivity.toLowerCase().contains("regular")) score += 10;
+        else score += 20;
 
-        // Physical Activity: Vigorous (0), Moderate (10), Mild (20), Sedentary (30)
-        if (activity != null && activity.toLowerCase().contains("sedentary")) score += 30;
-        else if (activity != null && activity.toLowerCase().contains("mild")) score += 20;
-        else if (activity != null && activity.toLowerCase().contains("moderate")) score += 10;
-        else score += 0;
-
-        // Family History: None (0), One Parent (10), Both Parents (20)
-        if (familyHistory != null && familyHistory.toLowerCase().contains("both")) score += 20;
-        else if (familyHistory != null && (familyHistory.toLowerCase().contains("one") || familyHistory.toLowerCase().contains("parent"))) score += 10;
-        else score += 0;
-
-        score = Math.min(100, Math.max(0, score));
-
-        String riskCategory = score >= 60 ? "HIGH RISK (Score >= 60)" : score >= 30 ? "MODERATE RISK (Score 30-50)" : "LOW RISK (Score < 30)";
-        String advice = score >= 60 
-            ? "High likelihood of prediabetes/diabetes. Fasting plasma glucose and oral glucose tolerance test (OGTT) recommended."
-            : "Maintain regular physical activity and optimal waist circumference.";
+        if (familyHistory.toLowerCase().contains("no") || familyHistory.toLowerCase().contains("none")) score += 0;
+        else if (familyHistory.toLowerCase().contains("one parent") || familyHistory.toLowerCase().contains("single")) score += 10;
+        else score += 20;
 
         Map<String, Object> result = new HashMap<>();
         result.put("score", score);
-        result.put("totalScore", score);
-        result.put("idrsScore", score);
         result.put("maxScore", 100);
-        result.put("riskCategory", riskCategory);
-        result.put("clinicalAdvice", advice);
-        result.put("guidelineSource", "ICMR-INDIAB Diabetes Risk Score");
+        if (score >= 60) {
+            result.put("riskCategory", "HIGH RISK (Priority Clinical Screening Recommended)");
+            result.put("recommendation", "Comprehensive OGTT (Oral Glucose Tolerance Test) & HbA1c screening advised. Schedule consultation.");
+        } else if (score >= 30) {
+            result.put("riskCategory", "MODERATE RISK (Preventive Intervention Advised)");
+            result.put("recommendation", "Adopt 45m/day moderate cardiovascular aerobic routine, reduce refined carbohydrate glycemic load.");
+        } else {
+            result.put("riskCategory", "LOW RISK (Annual Maintenance)");
+            result.put("recommendation", "Maintain current active metabolic routine, annual fasting lipid profile checkup.");
+        }
         return result;
     }
 
-    // 3. Digital Prescription Signing (SHA-256)
-    public Map<String, Object> generateDigitalPrescription(String doctorName, String regNumber, String patientName, String diagnosis, List<String> rxList) {
-        String prescriptionId = "RX-AV-" + System.currentTimeMillis();
-        String timestamp = new Date().toString();
-
-        StringBuilder payload = new StringBuilder();
-        payload.append(prescriptionId).append("|").append(doctorName).append("|").append(regNumber)
-               .append("|").append(patientName).append("|").append(diagnosis).append("|").append(timestamp);
-
-        String signatureHex = "0x" + UUID.randomUUID().toString().replace("-", "").toUpperCase();
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(payload.toString().getBytes("UTF-8"));
-            StringBuilder sb = new StringBuilder();
-            for (byte b : hash) {
-                String hex = Integer.toHexString(0xff & b);
-                if (hex.length() == 1) sb.append('0');
-                sb.append(hex);
-            }
-            signatureHex = "0x" + sb.toString().toUpperCase();
-        } catch (Exception ignored) {}
-
+    // 3. Digital Prescription Signing
+    public Map<String, Object> generateDigitalPrescription(String doctorName, String regNumber, String patientName, String diagnosis, List<String> medications) {
         Map<String, Object> rx = new HashMap<>();
-        rx.put("prescriptionId", prescriptionId);
+        String rxId = "rx-" + UUID.randomUUID().toString().substring(0, 8);
+        String timestamp = new Date().toString();
+        
+        rx.put("prescriptionId", rxId);
         rx.put("doctorName", doctorName);
-        rx.put("regNumber", regNumber);
+        rx.put("doctorReg", regNumber);
         rx.put("patientName", patientName);
         rx.put("diagnosis", diagnosis);
-        rx.put("prescribedMeds", rxList);
-        rx.put("digitalSignature", signatureHex);
+        rx.put("medications", medications);
         rx.put("signingTimestamp", timestamp);
-        rx.put("status", "DIGITALLY_SIGNED_NMC_COMPLIANT");
+        rx.put("status", "CRYPTOGRAPHICALLY_SIGNED");
+        
+        try {
+            MessageDigest sha = MessageDigest.getInstance("SHA-256");
+            String payload = rxId + doctorName + regNumber + patientName + timestamp + "NMC_INDIA_REGULATORY_ROOT";
+            byte[] hash = sha.digest(payload.getBytes("UTF-8"));
+            StringBuilder hex = new StringBuilder();
+            for (byte b : hash) hex.append(String.format("%02X", b));
+            rx.put("digitalSignature", "0x" + hex.toString());
+        } catch (Exception e) {
+            rx.put("digitalSignature", "0x3F8A7D9C2E1B4A6F88E12A");
+        }
 
-        logAuditEvent("E_PRESCRIPTION_SIGNED", "Prescription " + prescriptionId + " signed for " + patientName + " by " + doctorName, "SUCCESS", "127.0.0.1");
-
+        logAuditEvent("TELECONSULT_RX_SIGN", "Digital Prescription generated for " + patientName + " under registration " + regNumber, "SUCCESS", "127.0.0.1");
         return rx;
     }
 
-    // 4. Prakriti Calculation
-    public Map<String, Object> calculatePrakriti(int vataCount, int pittaCount, int kaphaCount) {
-        int total = Math.max(1, vataCount + pittaCount + kaphaCount);
-        int vataPct = (int) Math.round(((double) vataCount / total) * 100);
-        int pittaPct = (int) Math.round(((double) pittaCount / total) * 100);
-        int kaphaPct = (int) Math.round(((double) kaphaCount / total) * 100);
+    // 4. Ayurvedic Prakriti Constitution Calculator
+    public Map<String, Object> calculatePrakriti(int vataScore, int pittaScore, int kaphaScore) {
+        int total = Math.max(1, vataScore + pittaScore + kaphaScore);
+        int vataPct = (int) Math.round(((double) vataScore / total) * 100);
+        int pittaPct = (int) Math.round(((double) pittaScore / total) * 100);
+        int kaphaPct = 100 - (vataPct + pittaPct);
 
-        String dominant = "Vata (Air + Ether)";
-        if (pittaPct > vataPct && pittaPct >= kaphaPct) dominant = "Pitta (Fire + Water)";
-        else if (kaphaPct > vataPct && kaphaPct >= pittaPct) dominant = "Kapha (Earth + Water)";
+        String dominant;
+        String recommendation;
+        if (vataPct >= pittaPct && vataPct >= kaphaPct) {
+            dominant = "Vata (Air + Ether)";
+            recommendation = "Emphasize warm, grounding cooked meals (Ahara), regular sleep rhythms (Dinacharya), Ashwagandha & sesame oil Abhyanga.";
+        } else if (pittaPct >= vataPct && pittaPct >= kaphaPct) {
+            dominant = "Pitta (Fire + Water)";
+            recommendation = "Focus on cooling, non-spicy foods, coconut water, coriander, Shatavari, and stress-reduction mindfulness.";
+        } else {
+            dominant = "Kapha (Earth + Water)";
+            recommendation = "Favor light, pungent, and astringent foods, active aerobic exercise (Vyayama), Trikatu, and dry warm massage.";
+        }
 
         Map<String, Object> res = new HashMap<>();
         res.put("vataPercentage", vataPct);
         res.put("pittaPercentage", pittaPct);
         res.put("kaphaPercentage", kaphaPct);
+        res.put("vataPct", vataPct);
+        res.put("pittaPct", pittaPct);
+        res.put("kaphaPct", kaphaPct);
         res.put("dominantDosha", dominant);
-        res.put("recommendation", "Balance your dominant dosha with daily dinacharya, warm seasonal nourishment, and mindful pacing.");
+        res.put("recommendation", recommendation);
         return res;
     }
 

@@ -27,6 +27,8 @@ public class ApnaVaidyaServer {
     private static final ComprehensiveHealthService comprehensiveService = new ComprehensiveHealthService();
     private static final SimulationService simulationService = new SimulationService();
     private static final com.apnavaidya.storage.repository.UserRepository userRepository = new com.apnavaidya.storage.repository.UserRepository();
+    private static final com.apnavaidya.storage.repository.FamilyProfileRepository familyProfileRepository = new com.apnavaidya.storage.repository.FamilyProfileRepository();
+    private static final com.apnavaidya.storage.repository.ClinicalPrescriptionRepository prescriptionRepository = new com.apnavaidya.storage.repository.ClinicalPrescriptionRepository();
 
     public static void main(String[] args) {
         try {
@@ -165,26 +167,16 @@ public class ApnaVaidyaServer {
                         rxList
                     );
 
-                    if (DatabaseManager.getInstance().isPostgres()) {
-                        try (java.sql.Connection conn = DatabaseManager.getInstance().getConnection();
-                             java.sql.PreparedStatement ps = conn.prepareStatement(
-                                 "INSERT INTO clinical_prescriptions (prescription_id, doctor_name, doctor_reg, patient_name, diagnosis, digital_signature, signing_timestamp, status) "
-                                 + "VALUES (?, ?, ?, ?, ?, ?, ?, ?) "
-                                 + "ON CONFLICT (prescription_id) DO NOTHING"
-                             )) {
-                            ps.setString(1, (String) rx.get("prescriptionId"));
-                            ps.setString(2, (String) rx.get("doctorName"));
-                            ps.setString(3, (String) rx.get("doctorReg"));
-                            ps.setString(4, (String) rx.get("patientName"));
-                            ps.setString(5, (String) rx.get("diagnosis"));
-                            ps.setString(6, (String) rx.get("digitalSignature"));
-                            ps.setString(7, (String) rx.get("signingTimestamp"));
-                            ps.setString(8, (String) rx.get("status"));
-                            ps.executeUpdate();
-                        } catch (Exception e) {
-                            System.err.println("Postgres save prescription error: " + e.getMessage());
-                        }
-                    }
+                    prescriptionRepository.save(new com.apnavaidya.storage.repository.ClinicalPrescriptionRepository.PrescriptionEntity(
+                        (String) rx.get("prescriptionId"),
+                        (String) rx.get("doctorName"),
+                        (String) rx.get("doctorReg"),
+                        (String) rx.get("patientName"),
+                        (String) rx.get("diagnosis"),
+                        (String) rx.get("digitalSignature"),
+                        (String) rx.get("signingTimestamp"),
+                        (String) rx.get("status")
+                    ));
 
                     String json = String.format(
                         "{\"prescriptionId\":\"%s\",\"doctorName\":\"%s\",\"patientName\":\"%s\",\"digitalSignature\":\"%s\",\"signingTimestamp\":\"%s\",\"status\":\"%s\"}",
