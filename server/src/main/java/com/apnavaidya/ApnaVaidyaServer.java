@@ -1111,25 +1111,23 @@ public class ApnaVaidyaServer {
         if (envOrigins != null && !envOrigins.trim().isEmpty()) {
             String[] allowed = envOrigins.split(",");
             for (String a : allowed) {
-                if (origin != null && a.trim().equalsIgnoreCase(origin.trim())) {
+                if (origin != null && (a.trim().equalsIgnoreCase(origin.trim()) || "*".equals(a.trim()))) {
                     allowOrigin = origin;
                     break;
                 }
             }
-            if (origin != null && !allowOrigin.equals(origin) && allowed.length > 0) {
-                allowOrigin = allowed[0].trim();
-            }
-        } else if (origin != null) {
-            // Local dev & recognized hosting domains
-            if (origin.startsWith("http://localhost:") || origin.startsWith("http://127.0.0.1:") || origin.endsWith(".vercel.app") || origin.endsWith(".netlify.app") || origin.endsWith(".onrender.com")) {
+            if (origin != null && origin.endsWith(".vercel.app")) {
                 allowOrigin = origin;
             }
+        } else if (origin != null && (origin.endsWith(".vercel.app") || origin.startsWith("http://localhost:"))) {
+            allowOrigin = origin;
         }
 
         headers.set("Access-Control-Allow-Origin", allowOrigin);
         headers.set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-        headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization, Accept, X-Requested-With");
+        headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Accept");
         headers.set("Access-Control-Allow-Credentials", "true");
+        headers.set("Access-Control-Max-Age", "86400");
         headers.set("Content-Type", "application/json; charset=UTF-8");
     }
 

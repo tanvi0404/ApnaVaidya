@@ -244,8 +244,21 @@ export async function calculateVascularBackend(vascularParams) {
   }
 }
 
-export async function fetchMedicationsFromBackend(profileId = 'user-arjun') {
-  const cacheKey = `apnavaidya_meds_${profileId}`;
+function getActiveUserId() {
+  try {
+    const raw = localStorage.getItem('apnavaidya_auth_user');
+    if (raw) {
+      const u = JSON.parse(raw);
+      if (u?.user?.id) return u.user.id;
+      if (u?.id) return u.id;
+    }
+  } catch (_) {}
+  return null;
+}
+
+export async function fetchMedicationsFromBackend(profileId = null) {
+  const resolvedProfileId = profileId || getActiveUserId() || 'user-arjun';
+  const cacheKey = `apnavaidya_meds_${resolvedProfileId}`;
   let cached = null;
   try {
     const saved = localStorage.getItem(cacheKey);
@@ -254,14 +267,15 @@ export async function fetchMedicationsFromBackend(profileId = 'user-arjun') {
 
   try {
     const urlBase = await getBaseUrl();
-    const res = await fetch(`${urlBase}/medications?profileId=${profileId}`, { headers: getAuthHeaders() });
+    const url = profileId ? `${urlBase}/medications?profileId=${profileId}` : `${urlBase}/medications`;
+    const res = await fetch(url, { headers: getAuthHeaders() });
     if (!res.ok) throw new Error(`HTTP error ${res.status}`);
     const data = await res.json();
     try { localStorage.setItem(cacheKey, JSON.stringify(data)); } catch (_) {}
     return data;
   } catch (err) {
     console.warn('Medications backend fallback:', err.message);
-    return cached || MEDICATIONS_DATA[profileId] || MEDICATIONS_DATA['user-arjun'];
+    return cached || MEDICATIONS_DATA[resolvedProfileId] || MEDICATIONS_DATA['user-arjun'] || [];
   }
 }
 
@@ -417,10 +431,11 @@ export async function triageSymptomsBackend(symptoms, durationDays = 2) {
   }
 }
 
-export async function fetchWearablesSyncBackend(profileId = 'user-arjun') {
+export async function fetchWearablesSyncBackend(profileId = null) {
+  const resolvedProfileId = profileId || getActiveUserId() || 'user-arjun';
   try {
     const urlBase = await getBaseUrl();
-    const res = await fetch(`${urlBase}/wearables/sync?profileId=${profileId}`, { headers: getAuthHeaders() });
+    const res = await fetch(`${urlBase}/wearables/sync?profileId=${resolvedProfileId}`, { headers: getAuthHeaders() });
     if (!res.ok) throw new Error(`HTTP error ${res.status}`);
     return await res.json();
   } catch (err) {
@@ -445,10 +460,11 @@ export async function simulateWhatIfBackend(simParams) {
   }
 }
 
-export async function fetchMicrobiomeProfileBackend(profileId = 'user-arjun') {
+export async function fetchMicrobiomeProfileBackend(profileId = null) {
+  const resolvedProfileId = profileId || getActiveUserId() || 'user-arjun';
   try {
     const urlBase = await getBaseUrl();
-    const res = await fetch(`${urlBase}/microbiome/profile?profileId=${profileId}`, { headers: getAuthHeaders() });
+    const res = await fetch(`${urlBase}/microbiome/profile?profileId=${resolvedProfileId}`, { headers: getAuthHeaders() });
     if (!res.ok) throw new Error(`HTTP error ${res.status}`);
     return await res.json();
   } catch (err) {
@@ -473,13 +489,14 @@ export async function fetchExposomeCityBackend(city = 'Delhi NCR') {
   }
 }
 
-export async function fetchNutritionPlanBackend({ profileId = 'user-arjun', hba1c = 5.8, ldl = 146.0 }) {
+export async function fetchNutritionPlanBackend({ profileId = null, hba1c = 5.8, ldl = 146.0 } = {}) {
+  const resolvedProfileId = profileId || getActiveUserId() || 'user-arjun';
   try {
     const urlBase = await getBaseUrl();
     const res = await fetch(`${urlBase}/nutrition/plan`, {
       method: 'POST',
       headers: getAuthHeaders(),
-      body: JSON.stringify({ profileId, hba1c, ldl })
+      body: JSON.stringify({ profileId: resolvedProfileId, hba1c, ldl })
     });
     if (!res.ok) throw new Error(`HTTP error ${res.status}`);
     return await res.json();
@@ -489,13 +506,14 @@ export async function fetchNutritionPlanBackend({ profileId = 'user-arjun', hba1
   }
 }
 
-export async function fetchExerciseRoutineBackend({ profileId = 'user-arjun', restingHr = 68 }) {
+export async function fetchExerciseRoutineBackend({ profileId = null, restingHr = 68 } = {}) {
+  const resolvedProfileId = profileId || getActiveUserId() || 'user-arjun';
   try {
     const urlBase = await getBaseUrl();
     const res = await fetch(`${urlBase}/exercise/routine`, {
       method: 'POST',
       headers: getAuthHeaders(),
-      body: JSON.stringify({ profileId, restingHr })
+      body: JSON.stringify({ profileId: resolvedProfileId, restingHr })
     });
     if (!res.ok) throw new Error(`HTTP error ${res.status}`);
     return await res.json();
