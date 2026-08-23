@@ -13,6 +13,7 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * Thread-Safe Relational Repository for Family Profiles
  * Backed by PostgreSQL in production with local JSON fallback.
+ * Strictly isolates profiles per authenticated user_id.
  */
 public class FamilyProfileRepository {
 
@@ -21,52 +22,12 @@ public class FamilyProfileRepository {
 
     public FamilyProfileRepository() {
         this.db = DatabaseManager.getInstance();
-        loadAll();
+        if (!db.isPostgres()) {
+            loadLocalJson();
+        }
     }
 
-    private synchronized void loadAll() {
-        if (db.isPostgres()) {
-            Connection conn = null;
-            try {
-                conn = db.getConnection();
-                if (conn != null) {
-                    try (PreparedStatement ps = conn.prepareStatement("SELECT * FROM family_profiles");
-                         ResultSet rs = ps.executeQuery()) {
-                        while (rs.next()) {
-                            String id = rs.getString("id");
-                            FamilyProfile profile = new FamilyProfile(
-                                id,
-                                rs.getString("user_id"),
-                                rs.getString("name"),
-                                rs.getString("relationship"),
-                                rs.getInt("age"),
-                                rs.getString("gender"),
-                                rs.getString("blood_group"),
-                                rs.getString("weight"),
-                                rs.getDouble("bmi"),
-                                rs.getString("avatar_initials"),
-                                rs.getString("avatar_color"),
-                                Collections.emptyList(),
-                                Collections.emptyList(),
-                                Collections.emptyList(),
-                                rs.getString("diet_preference")
-                            );
-                            if (id != null && !id.isEmpty()) {
-                                memoryIndex.put(id, profile);
-                            }
-                        }
-                        return;
-                    }
-                }
-            } catch (Exception e) {
-                System.err.println("Postgres family_profiles load error: " + e.getMessage());
-                throw new RuntimeException("Failed to load family profiles from PostgreSQL", e);
-            } finally {
-                db.releaseConnection(conn);
-            }
-        }
-
-        // Local JSON fallback
+    private synchronized void loadLocalJson() {
         String json = db.loadTableData("family_profiles");
         if (json != null && !json.trim().isEmpty()) {
             List<String> objects = JsonUtil.extractJsonObjects(json);
@@ -95,14 +56,57 @@ public class FamilyProfileRepository {
         }
     }
 
-    public List<FamilyProfile> findAll() {
-        return new ArrayList<>(memoryIndex.values());
-    }
-
+    /**
+     * Query profiles isolated strictly by authenticated user_id
+     */
     public List<FamilyProfile> findByUserId(String userId) {
+        if (userId == null || userId.trim().isEmpty()) return Collections.emptyList();
+
+        if (db.isPostgres()) {
+            Connection conn = null;
+            try {
+                conn = db.getConnection();
+                if (conn != null) {
+                    try (PreparedStatement ps = conn.prepareStatement("SELECT * FROM family_profiles WHERE user_id = ?")) {
+                        ps.setString(1, userId.trim());
+                        try (ResultSet rs = ps.executeQuery()) {
+                            List<FamilyProfile> results = new ArrayList<>();
+                            while (rs.next()) {
+                                FamilyProfile profile = new FamilyProfile(
+                                    rs.getString("id"),
+                                    rs.getString("user_id"),
+                                    rs.getString("name"),
+                                    rs.getString("relationship"),
+                                    rs.getInt("age"),
+                                    rs.getString("gender"),
+                                    rs.getString("blood_group"),
+                                    rs.getString("weight"),
+                                    rs.getDouble("bmi"),
+                                    rs.getString("avatar_initials"),
+                                    rs.getString("avatar_color"),
+                                    Collections.emptyList(),
+                                    Collections.emptyList(),
+                                    Collections.emptyList(),
+                                    rs.getString("diet_preference")
+                                );
+                                results.add(profile);
+                            }
+                            return results;
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                System.err.println("Postgres family_profiles findByUserId error: " + e.getMessage());
+                throw new RuntimeException("Failed to query family profiles for user from PostgreSQL: " + e.getMessage(), e);
+            } finally {
+                db.releaseConnection(conn);
+            }
+        }
+
+        // Local dev memory search
         List<FamilyProfile> results = new ArrayList<>();
         for (FamilyProfile p : memoryIndex.values()) {
-            if (userId != null && userId.equalsIgnoreCase(p.getUserId())) {
+            if (userId.trim().equalsIgnoreCase(p.getUserId())) {
                 results.add(p);
             }
         }
@@ -110,15 +114,65 @@ public class FamilyProfileRepository {
     }
 
     public Optional<FamilyProfile> findById(String id) {
-        return Optional.ofNullable(memoryIndex.get(id));
+        return findById(id, null);
     }
 
-    public synchronized FamilyProfile save(FamilyProfile profile, String userId) {
+    public Optional<FamilyProfile> findById(String id, String userId) {
+        if (id == null || id.isEmpty()) return Optional.empty();
+
+        if (db.isPostgres()) {
+            Connection conn = null;
+            try {
+                conn = db.getConnection();
+                if (conn != null) {
+                    try (PreparedStatement ps = conn.prepareStatement("SELECT * FROM family_profiles WHERE id = ? AND user_id = ?")) {
+                        ps.setString(1, id);
+                        ps.setString(2, userId);
+                        try (ResultSet rs = ps.executeQuery()) {
+                            if (rs.next()) {
+                                FamilyProfile profile = new FamilyProfile(
+                                    rs.getString("id"),
+                                    rs.getString("user_id"),
+                                    rs.getString("name"),
+                                    rs.getString("relationship"),
+                                    rs.getInt("age"),
+                                    rs.getString("gender"),
+                                    rs.getString("blood_group"),
+                                    rs.getString("weight"),
+                                    rs.getDouble("bmi"),
+                                    rs.getString("avatar_initials"),
+                                    rs.getString("avatar_color"),
+                                    Collections.emptyList(),
+                                    Collections.emptyList(),
+                                    Collections.emptyList(),
+                                    rs.getString("diet_preference")
+                                );
+                                return Optional.of(profile);
+                            }
+                            return Optional.empty();
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to query family profile from PostgreSQL", e);
+            } finally {
+                db.releaseConnection(conn);
+            }
+        }
+
+        FamilyProfile p = memoryIndex.get(id);
+        if (p != null && (userId == null || userId.equalsIgnoreCase(p.getUserId()))) {
+            return Optional.of(p);
+        }
+        return Optional.empty();
+    }
+
+    public synchronized FamilyProfile save(FamilyProfile profile, String authenticatedUserId) {
         if (profile.getId() == null || profile.getId().isEmpty()) {
             profile.setId("profile-" + System.currentTimeMillis());
         }
-        if (userId != null && !userId.isEmpty()) {
-            profile.setUserId(userId);
+        if (authenticatedUserId != null && !authenticatedUserId.isEmpty()) {
+            profile.setUserId(authenticatedUserId);
         } else if (profile.getUserId() == null || profile.getUserId().isEmpty()) {
             profile.setUserId("user-default");
         }
@@ -158,7 +212,7 @@ public class FamilyProfileRepository {
                 }
             } catch (Exception e) {
                 System.err.println("Postgres save family profile error: " + e.getMessage());
-                throw new RuntimeException("Failed to save family profile to PostgreSQL", e);
+                throw new RuntimeException("Failed to save family profile to PostgreSQL: " + e.getMessage(), e);
             } finally {
                 db.releaseConnection(conn);
             }

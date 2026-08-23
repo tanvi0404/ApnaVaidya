@@ -18,7 +18,7 @@ public class MedicationService {
     }
 
     private void initIfEmpty() {
-        if (medicationRepo.findAll().isEmpty()) {
+        if (!com.apnavaidya.storage.DatabaseManager.getInstance().isPostgres() && medicationRepo.findAll().isEmpty()) {
             initMedications();
         }
     }

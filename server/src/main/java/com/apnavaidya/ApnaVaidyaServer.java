@@ -460,10 +460,13 @@ public class ApnaVaidyaServer {
                 if ("POST".equalsIgnoreCase(exchange.getRequestMethod())) {
                     String body = readBody(exchange);
                     String profileId = extractJsonString(body, "profileId");
+                    if (profileId.isEmpty()) {
+                        profileId = getAuthenticatedUserId(exchange);
+                    }
                     double hba1c = extractJsonDouble(body, "hba1c", 5.8);
                     double ldl = extractJsonDouble(body, "ldl", 146.0);
 
-                    Map<String, Object> nut = comprehensiveService.getNutritionPlan(profileId.isEmpty() ? "user-arjun" : profileId, hba1c, ldl);
+                    Map<String, Object> nut = comprehensiveService.getNutritionPlan(profileId, hba1c, ldl);
                     String json = String.format(
                         "{\"profileId\":\"%s\",\"dailyCalories\":%d,\"proteinGrams\":%d,\"carbGrams\":%d,\"fatGrams\":%d,\"glycemicStrategy\":\"%s\",\"primaryFocus\":\"%s\"}",
                         nut.get("profileId"), (Integer) nut.get("dailyCalories"), (Integer) nut.get("proteinGrams"),
@@ -492,9 +495,12 @@ public class ApnaVaidyaServer {
                 if ("POST".equalsIgnoreCase(exchange.getRequestMethod())) {
                     String body = readBody(exchange);
                     String profileId = extractJsonString(body, "profileId");
+                    if (profileId.isEmpty()) {
+                        profileId = getAuthenticatedUserId(exchange);
+                    }
                     int restingHr = extractJsonInt(body, "restingHr", 68);
 
-                    Map<String, Object> ex = comprehensiveService.getExercisePlan(profileId.isEmpty() ? "user-arjun" : profileId, restingHr);
+                    Map<String, Object> ex = comprehensiveService.getExercisePlan(profileId, restingHr);
                     String json = String.format(
                         "{\"profileId\":\"%s\",\"zone2HeartRateRange\":\"%s\",\"weeklyTargetMinutes\":%d,\"recommendedModality\":\"%s\",\"estimatedVo2MaxGain\":\"%s\"}",
                         ex.get("profileId"), escapeJson((String) ex.get("zone2HeartRateRange")),
@@ -560,7 +566,7 @@ public class ApnaVaidyaServer {
                         profileId = query.split("profileId=")[1].split("&")[0];
                     }
                     List<MedicationItem> meds = medicationService.getMedicationsByProfile(profileId);
-                    if (meds.isEmpty() && ("user-arjun".equals(profileId) || "all".equals(profileId))) {
+                    if (meds.isEmpty() && "all".equals(profileId)) {
                         meds = medicationService.getAllMedications();
                     }
                     StringBuilder sb = new StringBuilder("[");
@@ -599,9 +605,6 @@ public class ApnaVaidyaServer {
 
                 if ("GET".equalsIgnoreCase(method)) {
                     List<FamilyProfile> profiles = familyProfileRepository.findByUserId(authUserId);
-                    if (profiles.isEmpty() && "user-arjun".equals(authUserId)) {
-                        profiles = familyProfileRepository.findAll();
-                    }
                     StringBuilder sb = new StringBuilder("[");
                     for (int i = 0; i < profiles.size(); i++) {
                         FamilyProfile p = profiles.get(i);
@@ -756,7 +759,7 @@ public class ApnaVaidyaServer {
                         profileId = query.split("profileId=")[1].split("&")[0];
                     }
                     List<MedicalReport> reports = reportService.getReportsByProfile(profileId);
-                    if (reports.isEmpty() && ("user-arjun".equals(profileId) || "all".equals(profileId))) {
+                    if (reports.isEmpty() && "all".equals(profileId)) {
                         reports = reportService.getAllReports();
                     }
                     StringBuilder sb = new StringBuilder("[");

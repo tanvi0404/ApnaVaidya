@@ -19,7 +19,7 @@ public class ReportService {
     }
 
     private void initIfEmpty() {
-        if (reportRepo.findAll().isEmpty()) {
+        if (!com.apnavaidya.storage.DatabaseManager.getInstance().isPostgres() && reportRepo.findAll().isEmpty()) {
             initPreloadedReports();
         }
     }
