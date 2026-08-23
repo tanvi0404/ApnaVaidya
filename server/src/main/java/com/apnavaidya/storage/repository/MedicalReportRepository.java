@@ -87,9 +87,50 @@ public class MedicalReportRepository {
     }
 
     public List<MedicalReport> findByProfileId(String profileId) {
+        if (profileId == null || profileId.trim().isEmpty()) return Collections.emptyList();
+
+        if (db.isPostgres()) {
+            Connection conn = null;
+            try {
+                conn = db.getConnection();
+                if (conn != null) {
+                    try (PreparedStatement ps = conn.prepareStatement("SELECT * FROM medical_reports WHERE profile_id = ? ORDER BY id DESC")) {
+                        ps.setString(1, profileId.trim());
+                        try (ResultSet rs = ps.executeQuery()) {
+                            List<MedicalReport> list = new ArrayList<>();
+                            while (rs.next()) {
+                                String id = rs.getString("id");
+                                MedicalReport rep = new MedicalReport(
+                                    id,
+                                    rs.getString("profile_id"),
+                                    rs.getString("title"),
+                                    rs.getString("lab_name"),
+                                    rs.getString("test_date"),
+                                    rs.getString("category"),
+                                    rs.getString("ocr_confidence"),
+                                    rs.getString("summary_text"),
+                                    Collections.emptyList()
+                                );
+                                list.add(rep);
+                                if (id != null && !id.isEmpty()) {
+                                    memoryIndex.put(id, rep);
+                                }
+                            }
+                            return list;
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                System.err.println("Postgres reports findByProfileId error: " + e.getMessage());
+                throw new RuntimeException("Failed to query medical reports from PostgreSQL", e);
+            } finally {
+                db.releaseConnection(conn);
+            }
+        }
+
         List<MedicalReport> results = new ArrayList<>();
         for (MedicalReport r : memoryIndex.values()) {
-            if (profileId != null && profileId.equalsIgnoreCase(r.getProfileId())) {
+            if (profileId.equalsIgnoreCase(r.getProfileId())) {
                 results.add(r);
             }
         }

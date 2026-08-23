@@ -125,9 +125,14 @@ public class FamilyProfileRepository {
             try {
                 conn = db.getConnection();
                 if (conn != null) {
-                    try (PreparedStatement ps = conn.prepareStatement("SELECT * FROM family_profiles WHERE id = ? AND user_id = ?")) {
+                    String sql = (userId != null && !userId.trim().isEmpty())
+                        ? "SELECT * FROM family_profiles WHERE id = ? AND user_id = ?"
+                        : "SELECT * FROM family_profiles WHERE id = ?";
+                    try (PreparedStatement ps = conn.prepareStatement(sql)) {
                         ps.setString(1, id);
-                        ps.setString(2, userId);
+                        if (userId != null && !userId.trim().isEmpty()) {
+                            ps.setString(2, userId.trim());
+                        }
                         try (ResultSet rs = ps.executeQuery()) {
                             if (rs.next()) {
                                 FamilyProfile profile = new FamilyProfile(

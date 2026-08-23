@@ -559,16 +559,18 @@ public class ApnaVaidyaServer {
                     return;
                 }
 
+                String authUserId = getAuthenticatedUserId(exchange);
+
                 if ("GET".equalsIgnoreCase(method)) {
                     String query = exchange.getRequestURI().getQuery();
-                    String profileId = getAuthenticatedUserId(exchange);
+                    String profileId = authUserId;
                     if (query != null && query.contains("profileId=")) {
-                        profileId = query.split("profileId=")[1].split("&")[0];
+                        String reqProfile = query.split("profileId=")[1].split("&")[0];
+                        if (reqProfile.equals(authUserId) || familyProfileRepository.findById(reqProfile, authUserId).isPresent()) {
+                            profileId = reqProfile;
+                        }
                     }
                     List<MedicationItem> meds = medicationService.getMedicationsByProfile(profileId);
-                    if (meds.isEmpty() && "all".equals(profileId)) {
-                        meds = medicationService.getAllMedications();
-                    }
                     StringBuilder sb = new StringBuilder("[");
                     for (int i = 0; i < meds.size(); i++) {
                         sb.append(medicationToJson(meds.get(i)));
@@ -756,12 +758,12 @@ public class ApnaVaidyaServer {
                     String query = exchange.getRequestURI().getQuery();
                     String profileId = authUserId;
                     if (query != null && query.contains("profileId=")) {
-                        profileId = query.split("profileId=")[1].split("&")[0];
+                        String reqProfile = query.split("profileId=")[1].split("&")[0];
+                        if (reqProfile.equals(authUserId) || familyProfileRepository.findById(reqProfile, authUserId).isPresent()) {
+                            profileId = reqProfile;
+                        }
                     }
                     List<MedicalReport> reports = reportService.getReportsByProfile(profileId);
-                    if (reports.isEmpty() && "all".equals(profileId)) {
-                        reports = reportService.getAllReports();
-                    }
                     StringBuilder sb = new StringBuilder("[");
                     for (int i = 0; i < reports.size(); i++) {
                         MedicalReport r = reports.get(i);

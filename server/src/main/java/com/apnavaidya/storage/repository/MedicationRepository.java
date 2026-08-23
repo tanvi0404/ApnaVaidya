@@ -97,9 +97,55 @@ public class MedicationRepository {
     }
 
     public List<MedicationItem> findByProfileId(String profileId) {
+        if (profileId == null || profileId.trim().isEmpty()) return Collections.emptyList();
+
+        if (db.isPostgres()) {
+            Connection conn = null;
+            try {
+                conn = db.getConnection();
+                if (conn != null) {
+                    try (PreparedStatement ps = conn.prepareStatement("SELECT * FROM medications WHERE profile_id = ? ORDER BY id ASC")) {
+                        ps.setString(1, profileId.trim());
+                        try (ResultSet rs = ps.executeQuery()) {
+                            List<MedicationItem> list = new ArrayList<>();
+                            while (rs.next()) {
+                                String id = rs.getString("id");
+                                MedicationItem item = new MedicationItem(
+                                    id,
+                                    rs.getString("profile_id"),
+                                    rs.getString("name"),
+                                    rs.getString("generic_name"),
+                                    rs.getString("dosage"),
+                                    rs.getString("frequency"),
+                                    rs.getString("timing"),
+                                    rs.getString("food_instruction"),
+                                    rs.getString("prescribed_for"),
+                                    rs.getString("doctor_name"),
+                                    rs.getInt("remaining_days"),
+                                    rs.getInt("total_pills"),
+                                    rs.getInt("remaining_pills"),
+                                    rs.getBoolean("taken_today")
+                                );
+                                list.add(item);
+                                if (id != null && !id.isEmpty()) {
+                                    memoryIndex.put(id, item);
+                                }
+                            }
+                            return list;
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                System.err.println("Postgres medications findByProfileId error: " + e.getMessage());
+                throw new RuntimeException("Failed to query medications from PostgreSQL", e);
+            } finally {
+                db.releaseConnection(conn);
+            }
+        }
+
         List<MedicationItem> results = new ArrayList<>();
         for (MedicationItem m : memoryIndex.values()) {
-            if (profileId != null && profileId.equalsIgnoreCase(m.getProfileId())) {
+            if (profileId.equalsIgnoreCase(m.getProfileId())) {
                 results.add(m);
             }
         }
