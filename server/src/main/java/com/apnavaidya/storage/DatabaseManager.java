@@ -121,6 +121,8 @@ public class DatabaseManager {
     /**
      * Borrow a validated connection from the connection pool.
      * Strictly capped at MAX_POOL_SIZE live connections.
+     * When capacity is reached, waits for a returned connection.
+     * If timeout expires, throws SQLException without creating untracked direct connections.
      */
     public Connection getConnection() throws SQLException {
         if (!postgresConnected || cleanJdbcUrl == null) return null;
@@ -133,19 +135,24 @@ public class DatabaseManager {
                     return conn;
                 }
             } catch (SQLException ignored) {}
+            try { conn.close(); } catch (Exception ignored) {}
             currentPoolSize.updateAndGet(c -> Math.max(0, c - 1));
         }
 
         // 2. If pool has not reached MAX_POOL_SIZE, create a new one under synchronization
         synchronized (currentPoolSize) {
             if (currentPoolSize.get() < MAX_POOL_SIZE) {
-                Connection newConn = DriverManager.getConnection(cleanJdbcUrl, dbProps);
-                currentPoolSize.incrementAndGet();
-                return newConn;
+                try {
+                    Connection newConn = DriverManager.getConnection(cleanJdbcUrl, dbProps);
+                    currentPoolSize.incrementAndGet();
+                    return newConn;
+                } catch (SQLException e) {
+                    throw e;
+                }
             }
         }
 
-        // 3. Pool is at capacity. Strictly wait for an existing connection to be returned
+        // 3. Pool is at capacity (MAX_POOL_SIZE active connections). Strictly wait for an existing connection to return.
         try {
             conn = connectionPool.poll(5, TimeUnit.SECONDS);
             if (conn != null) {
@@ -154,14 +161,8 @@ public class DatabaseManager {
                         return conn;
                     }
                 } catch (SQLException ignored) {}
+                try { conn.close(); } catch (Exception ignored) {}
                 currentPoolSize.updateAndGet(c -> Math.max(0, c - 1));
-
-                // Replace invalid connection within pool limits
-                synchronized (currentPoolSize) {
-                    Connection newConn = DriverManager.getConnection(cleanJdbcUrl, dbProps);
-                    currentPoolSize.incrementAndGet();
-                    return newConn;
-                }
             }
             throw new SQLException("PostgreSQL connection pool exhausted. Maximum (" + MAX_POOL_SIZE + ") active connections in use.");
         } catch (InterruptedException e) {
