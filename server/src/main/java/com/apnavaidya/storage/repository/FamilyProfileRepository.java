@@ -231,6 +231,47 @@ public class FamilyProfileRepository {
         return save(profile, profile.getUserId());
     }
 
+    public synchronized boolean deleteById(String id) {
+        return deleteById(id, null);
+    }
+
+    public synchronized boolean deleteById(String id, String userId) {
+        if (id == null || id.isEmpty()) return false;
+        if (db.isPostgres()) {
+            Connection conn = null;
+            try {
+                conn = db.getConnection();
+                if (conn != null) {
+                    String sql = (userId != null && !userId.trim().isEmpty())
+                        ? "DELETE FROM family_profiles WHERE id = ? AND user_id = ?"
+                        : "DELETE FROM family_profiles WHERE id = ?";
+                    try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                        ps.setString(1, id.trim());
+                        if (userId != null && !userId.trim().isEmpty()) {
+                            ps.setString(2, userId.trim());
+                        }
+                        int affected = ps.executeUpdate();
+                        memoryIndex.remove(id);
+                        return affected > 0;
+                    }
+                }
+            } catch (Exception e) {
+                System.err.println("Postgres delete family profile error: " + e.getMessage());
+                throw new RuntimeException("Failed to delete family profile from PostgreSQL: " + e.getMessage(), e);
+            } finally {
+                db.releaseConnection(conn);
+            }
+        }
+
+        FamilyProfile p = memoryIndex.get(id);
+        if (p != null && (userId == null || userId.equalsIgnoreCase(p.getUserId()))) {
+            memoryIndex.remove(id);
+            flushToDisk();
+            return true;
+        }
+        return false;
+    }
+
     private void flushToDisk() {
         StringBuilder sb = new StringBuilder("[");
         List<FamilyProfile> list = new ArrayList<>(memoryIndex.values());

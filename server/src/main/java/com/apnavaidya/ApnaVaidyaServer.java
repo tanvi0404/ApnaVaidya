@@ -9,6 +9,8 @@ import java.io.*;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * ApnaVaidya Java 17 Backend HTTP REST Server
@@ -17,6 +19,48 @@ import java.util.*;
 public class ApnaVaidyaServer {
 
     private static final int PORT = 8080;
+
+    // In-memory sliding-window IP rate limiter
+    private static final ConcurrentHashMap<String, RateLimitTracker> rateLimitMap = new ConcurrentHashMap<>();
+    private static final int MAX_REQUESTS_PER_MINUTE_AUTH = 30; // 30 auth attempts / min per IP
+    private static final int MAX_REQUESTS_PER_MINUTE_API = 300; // 300 API requests / min per IP
+
+    private static class RateLimitTracker {
+        private final AtomicInteger count = new AtomicInteger(0);
+        private volatile long windowStartTime = System.currentTimeMillis();
+
+        public boolean tryAcquire(int limit) {
+            long now = System.currentTimeMillis();
+            if (now - windowStartTime > 60_000) {
+                synchronized (this) {
+                    if (now - windowStartTime > 60_000) {
+                        count.set(0);
+                        windowStartTime = now;
+                    }
+                }
+            }
+            return count.incrementAndGet() <= limit;
+        }
+    }
+
+    private static String getClientIp(HttpExchange exchange) {
+        String xForwardedFor = exchange.getRequestHeaders().getFirst("X-Forwarded-For");
+        if (xForwardedFor != null && !xForwardedFor.trim().isEmpty()) {
+            return xForwardedFor.split(",")[0].trim();
+        }
+        if (exchange.getRemoteAddress() != null && exchange.getRemoteAddress().getAddress() != null) {
+            return exchange.getRemoteAddress().getAddress().getHostAddress();
+        }
+        return "127.0.0.1";
+    }
+
+    private static boolean checkRateLimit(HttpExchange exchange, boolean isAuthEndpoint) {
+        String clientIp = getClientIp(exchange);
+        String key = (isAuthEndpoint ? "auth:" : "api:") + clientIp;
+        RateLimitTracker tracker = rateLimitMap.computeIfAbsent(key, k -> new RateLimitTracker());
+        int limit = isAuthEndpoint ? MAX_REQUESTS_PER_MINUTE_AUTH : MAX_REQUESTS_PER_MINUTE_API;
+        return tracker.tryAcquire(limit);
+    }
 
     private static final ReportService reportService = new ReportService();
     private static final ChikitsakAiService chatService = new ChikitsakAiService();
@@ -554,6 +598,11 @@ public class ApnaVaidyaServer {
                     return;
                 }
 
+                if (!checkRateLimit(exchange, false)) {
+                    sendResponse(exchange, 429, "{\"error\":\"Too Many Requests: API rate limit exceeded\"}");
+                    return;
+                }
+
                 if (!isAuthorized(exchange)) {
                     sendResponse(exchange, 401, "{\"error\":\"Unauthorized: Valid HMAC-SHA256 JWT Bearer token required\"}");
                     return;
@@ -581,8 +630,64 @@ public class ApnaVaidyaServer {
                 } else if ("POST".equalsIgnoreCase(method)) {
                     String body = readBody(exchange);
                     String medId = extractJsonString(body, "medId");
-                    boolean success = medicationService.toggleMedicationStatus(medId);
-                    sendResponse(exchange, 200, "{\"success\":" + success + ",\"medId\":\"" + escapeJson(medId) + "\"}");
+                    String name = extractJsonString(body, "name");
+
+                    if (!name.isEmpty()) {
+                        // Create / Add new prescription medication
+                        String genericName = extractJsonString(body, "genericName");
+                        String dosage = extractJsonString(body, "dosage");
+                        String frequency = extractJsonString(body, "frequency");
+                        String timing = extractJsonString(body, "timing");
+                        String foodInstruction = extractJsonString(body, "foodInstruction");
+                        String prescribedFor = extractJsonString(body, "prescribedFor");
+                        String doctorName = extractJsonString(body, "doctorName");
+                        int remainingDays = extractJsonInt(body, "remainingDays", 30);
+                        int totalPills = extractJsonInt(body, "totalPills", 60);
+                        int remainingPills = extractJsonInt(body, "remainingPills", 60);
+                        String profileId = extractJsonString(body, "profileId");
+                        if (profileId.isEmpty() || (!profileId.equals(authUserId) && familyProfileRepository.findById(profileId, authUserId).isEmpty())) {
+                            profileId = authUserId;
+                        }
+
+                        MedicationItem item = new MedicationItem(
+                            medId.isEmpty() ? "med-" + System.currentTimeMillis() : medId,
+                            profileId,
+                            name,
+                            genericName.isEmpty() ? name : genericName,
+                            dosage.isEmpty() ? "1 Tablet" : dosage,
+                            frequency.isEmpty() ? "Once Daily" : frequency,
+                            timing.isEmpty() ? "Morning" : timing,
+                            foodInstruction.isEmpty() ? "After food" : foodInstruction,
+                            prescribedFor.isEmpty() ? "General Maintenance" : prescribedFor,
+                            doctorName.isEmpty() ? "Consulting Physician" : doctorName,
+                            remainingDays,
+                            totalPills,
+                            remainingPills,
+                            false
+                        );
+                        medicationService.addMedication(item);
+                        sendResponse(exchange, 201, medicationToJson(item));
+                    } else {
+                        // Toggle adherence status
+                        boolean success = medicationService.toggleMedicationStatus(medId);
+                        sendResponse(exchange, 200, "{\"success\":" + success + ",\"medId\":\"" + escapeJson(medId) + "\"}");
+                    }
+                } else if ("DELETE".equalsIgnoreCase(method)) {
+                    String query = exchange.getRequestURI().getQuery();
+                    String id = "";
+                    if (query != null && query.contains("id=")) {
+                        id = query.split("id=")[1].split("&")[0];
+                    }
+                    if (id.isEmpty()) {
+                        String body = readBody(exchange);
+                        id = extractJsonString(body, "id");
+                    }
+                    if (id.isEmpty()) {
+                        sendResponse(exchange, 400, "{\"error\":\"Medication id is required for deletion\"}");
+                        return;
+                    }
+                    boolean deleted = medicationService.deleteMedication(id);
+                    sendResponse(exchange, 200, "{\"success\":" + deleted + ",\"id\":\"" + escapeJson(id) + "\"}");
                 } else {
                     sendResponse(exchange, 405, "{\"error\":\"Method Not Allowed\"}");
                 }
@@ -595,6 +700,11 @@ public class ApnaVaidyaServer {
 
                 if ("OPTIONS".equalsIgnoreCase(method)) {
                     sendResponse(exchange, 204, "");
+                    return;
+                }
+
+                if (!checkRateLimit(exchange, false)) {
+                    sendResponse(exchange, 429, "{\"error\":\"Too Many Requests: API rate limit exceeded\"}");
                     return;
                 }
 
@@ -656,6 +766,22 @@ public class ApnaVaidyaServer {
                     );
                     familyProfileRepository.save(profile, authUserId);
                     sendResponse(exchange, 200, "{\"success\":true,\"id\":\"" + escapeJson(profile.getId()) + "\"}");
+                } else if ("DELETE".equalsIgnoreCase(method)) {
+                    String query = exchange.getRequestURI().getQuery();
+                    String id = "";
+                    if (query != null && query.contains("id=")) {
+                        id = query.split("id=")[1].split("&")[0];
+                    }
+                    if (id.isEmpty()) {
+                        String body = readBody(exchange);
+                        id = extractJsonString(body, "id");
+                    }
+                    if (id.isEmpty()) {
+                        sendResponse(exchange, 400, "{\"error\":\"Profile id is required for deletion\"}");
+                        return;
+                    }
+                    boolean deleted = familyProfileRepository.deleteById(id, authUserId);
+                    sendResponse(exchange, 200, "{\"success\":" + deleted + ",\"id\":\"" + escapeJson(id) + "\"}");
                 } else {
                     sendResponse(exchange, 405, "{\"error\":\"Method Not Allowed\"}");
                 }
@@ -747,6 +873,11 @@ public class ApnaVaidyaServer {
                     return;
                 }
 
+                if (!checkRateLimit(exchange, false)) {
+                    sendResponse(exchange, 429, "{\"error\":\"Too Many Requests: API rate limit exceeded\"}");
+                    return;
+                }
+
                 if (!isAuthorized(exchange)) {
                     sendResponse(exchange, 401, "{\"error\":\"Unauthorized: Valid HMAC-SHA256 JWT Bearer token required\"}");
                     return;
@@ -794,6 +925,22 @@ public class ApnaVaidyaServer {
                     );
                     reportService.addReport(rep);
                     sendResponse(exchange, 201, reportToJson(rep));
+                } else if ("DELETE".equalsIgnoreCase(method)) {
+                    String query = exchange.getRequestURI().getQuery();
+                    String id = "";
+                    if (query != null && query.contains("id=")) {
+                        id = query.split("id=")[1].split("&")[0];
+                    }
+                    if (id.isEmpty()) {
+                        String body = readBody(exchange);
+                        id = extractJsonString(body, "id");
+                    }
+                    if (id.isEmpty()) {
+                        sendResponse(exchange, 400, "{\"error\":\"Report id is required for deletion\"}");
+                        return;
+                    }
+                    boolean deleted = reportService.deleteReport(id, authUserId);
+                    sendResponse(exchange, 200, "{\"success\":" + deleted + ",\"id\":\"" + escapeJson(id) + "\"}");
                 } else {
                     sendResponse(exchange, 405, "{\"error\":\"Method Not Allowed\"}");
                 }
@@ -804,6 +951,11 @@ public class ApnaVaidyaServer {
                 setCorsHeaders(exchange);
                 if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
                     sendResponse(exchange, 204, "");
+                    return;
+                }
+
+                if (!checkRateLimit(exchange, false)) {
+                    sendResponse(exchange, 429, "{\"error\":\"Too Many Requests: API rate limit exceeded\"}");
                     return;
                 }
 
@@ -909,6 +1061,11 @@ public class ApnaVaidyaServer {
                     return;
                 }
 
+                if (!checkRateLimit(exchange, true)) {
+                    sendResponse(exchange, 429, "{\"error\":\"Too Many Requests: Auth rate limit exceeded. Please try again in 60 seconds.\"}");
+                    return;
+                }
+
                 if ("POST".equalsIgnoreCase(exchange.getRequestMethod())) {
                     String body = readBody(exchange);
                     String identifier = extractJsonString(body, "identifier");
@@ -1008,6 +1165,11 @@ public class ApnaVaidyaServer {
                 setCorsHeaders(exchange);
                 if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
                     sendResponse(exchange, 204, "");
+                    return;
+                }
+
+                if (!checkRateLimit(exchange, true)) {
+                    sendResponse(exchange, 429, "{\"error\":\"Too Many Requests: Registration rate limit exceeded. Please try again later.\"}");
                     return;
                 }
 

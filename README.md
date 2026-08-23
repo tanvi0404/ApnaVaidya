@@ -12,7 +12,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-64748B.svg)](https://opensource.org/licenses/MIT)
 
 > ⚠️ **IMPORTANT CLINICAL & MEDICAL DISCLAIMER**  
-> **ApnaVaidya is an educational and research healthcare decision-support platform.** It is not a certified diagnostic medical device and does not replace professional medical judgment, clinical diagnosis, prescription writing, or emergency medical services. The AI insights and risk estimators are designed to assist patient health literacy. **In case of a medical emergency, immediately call 108 or 112 (India) or visit the nearest hospital emergency department.**
+> **ApnaVaidya is an educational and research healthcare decision-support platform designed following architectural privacy best practices.** It is not a certified medical device, does not possess statutory HIPAA/ABDM clinical certifications, and does not replace professional medical judgment, clinical diagnosis, prescription writing, or emergency medical services. In case of a medical emergency, immediately call 108 or 112 (India) or visit the nearest hospital emergency department.
 
 ---
 
@@ -266,8 +266,8 @@ npm run test:all
 | `/api/genomics/match` | `POST` | **Protected (JWT)** | CPIC precision drug-gene interaction guidelines |
 | `/api/symptoms/triage` | `POST` | **Protected (JWT)** | Clinical red-flag triage & specialist routing |
 | `/api/wearables/sync` | `GET` | **Protected (JWT)** | Wearables biometrics sync (Resting HR, HRV, VO2 max) |
-| `/api/teleconsult/sign-prescription` | `POST` | **Protected (JWT)** | NMC-compliant cryptographic SHA-256 digital signature |
-| `/api/security/audit-logs` | `GET` / `POST` | **Protected (JWT)** | Immutable ABDM/HIPAA SHA-256 audit log stream |
+| `/api/teleconsult/sign-prescription` | `POST` | **Protected (JWT)** | Cryptographic SHA-256 e-prescription signature |
+| `/api/security/audit-logs` | `GET` / `POST` | **Protected (JWT)** | Immutable chained SHA-256 audit ledger stream |
 
 ---
 

@@ -235,26 +235,39 @@ public class MedicationRepository {
     }
 
     public synchronized boolean deleteById(String id) {
-        MedicationItem removed = memoryIndex.remove(id);
-        if (removed != null) {
-            if (db.isPostgres()) {
-                Connection conn = null;
-                try {
-                    conn = db.getConnection();
-                    if (conn != null) {
-                        try (PreparedStatement ps = conn.prepareStatement("DELETE FROM medications WHERE id = ?")) {
-                            ps.setString(1, id);
-                            ps.executeUpdate();
+        return deleteById(id, null);
+    }
+
+    public synchronized boolean deleteById(String id, String profileId) {
+        if (id == null || id.isEmpty()) return false;
+        if (db.isPostgres()) {
+            Connection conn = null;
+            try {
+                conn = db.getConnection();
+                if (conn != null) {
+                    String sql = (profileId != null && !profileId.trim().isEmpty())
+                        ? "DELETE FROM medications WHERE id = ? AND profile_id = ?"
+                        : "DELETE FROM medications WHERE id = ?";
+                    try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                        ps.setString(1, id);
+                        if (profileId != null && !profileId.trim().isEmpty()) {
+                            ps.setString(2, profileId.trim());
                         }
-                        return true;
+                        int affected = ps.executeUpdate();
+                        memoryIndex.remove(id);
+                        return affected > 0;
                     }
-                } catch (Exception e) {
-                    System.err.println("Postgres delete medication error: " + e.getMessage());
-                    throw new RuntimeException("Failed to delete medication from PostgreSQL", e);
-                } finally {
-                    db.releaseConnection(conn);
                 }
+            } catch (Exception e) {
+                System.err.println("Postgres delete medication error: " + e.getMessage());
+                throw new RuntimeException("Failed to delete medication from PostgreSQL", e);
+            } finally {
+                db.releaseConnection(conn);
             }
+        }
+        MedicationItem removed = memoryIndex.get(id);
+        if (removed != null && (profileId == null || profileId.equalsIgnoreCase(removed.getProfileId()))) {
+            memoryIndex.remove(id);
             flushToDisk();
             return true;
         }

@@ -73,11 +73,19 @@ public class MedicationService {
 
     public List<MedicationItem> getMedicationsByProfile(String profileId) {
         List<MedicationItem> res = medicationRepo.findByProfileId(profileId);
-        return res.isEmpty() ? medicationRepo.findAll() : res;
+        return res != null ? res : Collections.emptyList();
     }
 
     public MedicationItem addMedication(MedicationItem item) {
         return medicationRepo.save(item);
+    }
+
+    public boolean deleteMedication(String id) {
+        return medicationRepo.deleteById(id);
+    }
+
+    public boolean deleteMedication(String id, String profileId) {
+        return medicationRepo.deleteById(id, profileId);
     }
 
     public boolean toggleMedicationTaken(String id) {

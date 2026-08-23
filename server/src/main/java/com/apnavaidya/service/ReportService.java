@@ -100,10 +100,18 @@ public class ReportService {
 
     public List<MedicalReport> getReportsByProfile(String profileId) {
         List<MedicalReport> res = reportRepo.findByProfileId(profileId);
-        return res.isEmpty() ? reportRepo.findAll() : res;
+        return res != null ? res : Collections.emptyList();
     }
 
     public MedicalReport addReport(MedicalReport newReport) {
         return reportRepo.save(newReport);
+    }
+
+    public boolean deleteReport(String id) {
+        return reportRepo.deleteById(id);
+    }
+
+    public boolean deleteReport(String id, String profileId) {
+        return reportRepo.deleteById(id, profileId);
     }
 }
