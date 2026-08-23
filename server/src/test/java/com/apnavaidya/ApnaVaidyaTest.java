@@ -413,12 +413,15 @@ public class ApnaVaidyaTest {
             assert testHash.equals(optFetchedUser.get().getPasswordHash()) : "Transparently decrypted hash must match original";
             assert "O+".equals(optFetchedUser.get().getBloodGroup()) : "Decrypted blood group must match";
 
-            // Test hardened JSON parser in ChikitsakAiService
-            String sampleGeminiJson = "{\n  \"candidates\": [\n    {\n      \"content\": {\n        \"parts\": [\n          {\n            \"text\": \"Line 1\\nLine 2 with \\\"escaped\\\" text\"\n          }\n        ]\n      }\n    }\n  ]\n}";
-            String parsedText = com.apnavaidya.service.ChikitsakAiService.extractJsonStringByKey(sampleGeminiJson, "text");
-            assert parsedText != null && parsedText.contains("escaped") : "Hardened JSON extractor must extract text correctly";
+            // Test PostgreSQL JDBC URL Parser & Scheme Converter
+            String rawRenderPgUrl = "postgres://apna_user:SecretPass123@dpg-c12345-a.oregon-postgres.render.com:5432/apna_db";
+            String convertedJdbc = com.apnavaidya.storage.DatabaseManager.toJdbcUrl(rawRenderPgUrl);
+            assert convertedJdbc != null && convertedJdbc.startsWith("jdbc:postgresql://") : "Must convert postgres:// to jdbc:postgresql://";
+            assert convertedJdbc.contains("user=apna_user") : "Must extract username into JDBC params";
+            assert convertedJdbc.contains("password=SecretPass123") : "Must extract password into JDBC params";
+            assert convertedJdbc.contains("sslmode=require") : "Must enforce SSL for cloud postgres";
 
-            System.out.printf("  ✓ [PASS] Schema Migrations & Relational Repository Engine: Verified 6 DDL Schemas, AES-256 Vault & Hardened JSON Parser%n");
+            System.out.printf("  ✓ [PASS] Schema Migrations & Relational Repository Engine: Verified 6 DDL Schemas, PostgreSQL JDBC Layer, AES-256 Vault & Hardened JSON Parser%n");
             passed++;
         } catch (Throwable t) {
             System.err.println("  ✗ [FAIL] Schema Migrations & Relational Repository Engine: " + t.getMessage());

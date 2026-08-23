@@ -7,11 +7,11 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "build:server": "javac --release 17 -d server/target/classes server/src/main/java/com/apnavaidya/model/*.java server/src/main/java/com/apnavaidya/storage/*.java server/src/main/java/com/apnavaidya/storage/repository/*.java server/src/main/java/com/apnavaidya/service/*.java server/src/main/java/com/apnavaidya/ApnaVaidyaServer.java",
+    "build:server": "node scripts/build-server.js",
     "test": "vitest run",
-    "test:server": "javac --release 17 -d server/target/classes server/src/main/java/com/apnavaidya/model/*.java server/src/main/java/com/apnavaidya/storage/*.java server/src/main/java/com/apnavaidya/storage/repository/*.java server/src/main/java/com/apnavaidya/service/*.java server/src/main/java/com/apnavaidya/ApnaVaidyaServer.java server/src/test/java/com/apnavaidya/ApnaVaidyaTest.java && java -cp server/target/classes com.apnavaidya.ApnaVaidyaTest",
+    "test:server": "node scripts/test-server.js",
     "test:all": "npm run test:server && vitest run",
-    "start:server": "java -cp server/target/classes com.apnavaidya.ApnaVaidyaServer",
+    "start:server": "node scripts/run-server.js",
     "build:all": "npm run build:server && npm run build"
   },
   "dependencies": {

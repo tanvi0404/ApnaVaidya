@@ -4,11 +4,14 @@ import com.apnavaidya.model.MedicalReport;
 import com.apnavaidya.storage.DatabaseManager;
 import com.apnavaidya.storage.JsonUtil;
 
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Phase 4: Thread-Safe Relational Repository for Medical Diagnostic Reports
+ * Relational Repository for Medical Diagnostic Reports with PostgreSQL & Local JSON fallback.
  */
 public class MedicalReportRepository {
 
@@ -21,6 +24,34 @@ public class MedicalReportRepository {
     }
 
     private synchronized void loadAll() {
+        if (db.isPostgres()) {
+            try (Connection conn = db.getConnection();
+                 PreparedStatement ps = conn.prepareStatement("SELECT * FROM medical_reports");
+                 ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    String id = rs.getString("id");
+                    MedicalReport rep = new MedicalReport(
+                        id,
+                        rs.getString("profile_id"),
+                        rs.getString("title"),
+                        rs.getString("lab_name"),
+                        rs.getString("test_date"),
+                        rs.getString("category"),
+                        rs.getString("ocr_confidence"),
+                        rs.getString("summary_text"),
+                        Collections.emptyList()
+                    );
+                    if (id != null && !id.isEmpty()) {
+                        memoryIndex.put(id, rep);
+                    }
+                }
+                return;
+            } catch (Exception e) {
+                System.err.println("Postgres reports load error: " + e.getMessage() + ", using local cache.");
+            }
+        }
+
+        // Local JSON fallback
         String json = db.loadTableData("reports");
         if (json != null && !json.trim().isEmpty()) {
             List<String> objects = JsonUtil.extractJsonObjects(json);
@@ -76,6 +107,33 @@ public class MedicalReportRepository {
             );
         }
         memoryIndex.put(report.getId(), report);
+
+        if (db.isPostgres()) {
+            try (Connection conn = db.getConnection();
+                 PreparedStatement ps = conn.prepareStatement(
+                     "INSERT INTO medical_reports (id, profile_id, title, category, lab_name, test_date, upload_date, status, summary_text, ocr_confidence, parameters_json, created_at) "
+                     + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+                     + "ON CONFLICT (id) DO UPDATE SET title = EXCLUDED.title, category = EXCLUDED.category, lab_name = EXCLUDED.lab_name, "
+                     + "test_date = EXCLUDED.test_date, status = EXCLUDED.status, summary_text = EXCLUDED.summary_text, ocr_confidence = EXCLUDED.ocr_confidence"
+                 )) {
+                ps.setString(1, report.getId());
+                ps.setString(2, report.getProfileId() != null ? report.getProfileId() : "user-arjun");
+                ps.setString(3, report.getTitle());
+                ps.setString(4, report.getCategory());
+                ps.setString(5, report.getLabName());
+                ps.setString(6, report.getDate());
+                ps.setString(7, java.time.LocalDate.now().toString());
+                ps.setString(8, "Analyzed");
+                ps.setString(9, report.getOverallSummary());
+                ps.setString(10, report.getOcrConfidence());
+                ps.setString(11, "[]");
+                ps.setString(12, java.time.Instant.now().toString());
+                ps.executeUpdate();
+            } catch (Exception e) {
+                System.err.println("Postgres save report error: " + e.getMessage());
+            }
+        }
+
         flushToDisk();
         return report;
     }
@@ -83,6 +141,15 @@ public class MedicalReportRepository {
     public synchronized boolean deleteById(String id) {
         MedicalReport removed = memoryIndex.remove(id);
         if (removed != null) {
+            if (db.isPostgres()) {
+                try (Connection conn = db.getConnection();
+                     PreparedStatement ps = conn.prepareStatement("DELETE FROM medical_reports WHERE id = ?")) {
+                    ps.setString(1, id);
+                    ps.executeUpdate();
+                } catch (Exception e) {
+                    System.err.println("Postgres delete report error: " + e.getMessage());
+                }
+            }
             flushToDisk();
             return true;
         }

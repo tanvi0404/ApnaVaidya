@@ -16,6 +16,28 @@ public class ComprehensiveHealthService {
     }
 
     private void loadOrInitLogs() {
+        if (db.isPostgres()) {
+            try (java.sql.Connection conn = db.getConnection();
+                 java.sql.PreparedStatement ps = conn.prepareStatement("SELECT * FROM audit_logs ORDER BY created_at DESC LIMIT 100");
+                 java.sql.ResultSet rs = ps.executeQuery()) {
+                auditLogs.clear();
+                while (rs.next()) {
+                    Map<String, Object> log = new HashMap<>();
+                    log.put("id", rs.getString("id"));
+                    log.put("eventType", rs.getString("event_type"));
+                    log.put("details", rs.getString("details"));
+                    log.put("status", rs.getString("status"));
+                    log.put("ipAddress", rs.getString("ip_address"));
+                    log.put("timestamp", rs.getString("timestamp"));
+                    log.put("blockHash", rs.getString("block_hash"));
+                    auditLogs.add(log);
+                }
+                if (!auditLogs.isEmpty()) return;
+            } catch (Exception e) {
+                System.err.println("Postgres audit logs load error: " + e.getMessage());
+            }
+        }
+
         String json = db.loadTableData("audit_logs");
         if (json != null && !json.trim().isEmpty() && !json.trim().equals("[]")) {
             parseLogsJson(json);
@@ -57,6 +79,27 @@ public class ComprehensiveHealthService {
         }
 
         auditLogs.add(0, log);
+
+        if (db.isPostgres()) {
+            try (java.sql.Connection conn = db.getConnection();
+                 java.sql.PreparedStatement ps = conn.prepareStatement(
+                     "INSERT INTO audit_logs (id, timestamp, event_type, details, status, ip_address, block_hash, created_at) "
+                     + "VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+                 )) {
+                ps.setString(1, (String) log.get("id"));
+                ps.setString(2, (String) log.get("timestamp"));
+                ps.setString(3, (String) log.get("eventType"));
+                ps.setString(4, (String) log.get("details"));
+                ps.setString(5, (String) log.get("status"));
+                ps.setString(6, (String) log.get("ipAddress"));
+                ps.setString(7, (String) log.get("blockHash"));
+                ps.setString(8, java.time.Instant.now().toString());
+                ps.executeUpdate();
+            } catch (Exception e) {
+                System.err.println("Postgres save audit log error: " + e.getMessage());
+            }
+        }
+
         saveLogs();
         return log;
     }

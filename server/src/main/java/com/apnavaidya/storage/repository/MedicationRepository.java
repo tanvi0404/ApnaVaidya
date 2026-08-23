@@ -4,11 +4,14 @@ import com.apnavaidya.model.MedicationItem;
 import com.apnavaidya.storage.DatabaseManager;
 import com.apnavaidya.storage.JsonUtil;
 
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Phase 4: Thread-Safe Relational Repository for Prescription Medications
+ * Relational Repository for Prescription Medications with PostgreSQL & Local JSON fallback.
  */
 public class MedicationRepository {
 
@@ -21,6 +24,37 @@ public class MedicationRepository {
     }
 
     private synchronized void loadAll() {
+        if (db.isPostgres()) {
+            try (Connection conn = db.getConnection();
+                 PreparedStatement ps = conn.prepareStatement("SELECT * FROM medications");
+                 ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    String id = rs.getString("id");
+                    MedicationItem item = new MedicationItem(
+                        id,
+                        rs.getString("profile_id"),
+                        rs.getString("name"),
+                        rs.getString("generic_name"),
+                        rs.getString("dosage"),
+                        rs.getString("frequency"),
+                        rs.getString("timing"),
+                        rs.getString("food_instruction"),
+                        rs.getString("prescribed_for"),
+                        rs.getString("doctor_name"),
+                        rs.getInt("remaining_days"),
+                        rs.getInt("total_pills"),
+                        rs.getInt("remaining_pills"),
+                        rs.getBoolean("taken_today")
+                    );
+                    memoryIndex.put(id, item);
+                }
+                return;
+            } catch (Exception e) {
+                System.err.println("Postgres medications load error: " + e.getMessage() + ", using local cache.");
+            }
+        }
+
+        // Local JSON fallback
         String json = db.loadTableData("medications");
         if (json != null && !json.trim().isEmpty()) {
             List<String> objects = JsonUtil.extractJsonObjects(json);
@@ -73,6 +107,37 @@ public class MedicationRepository {
             item.setId("med-" + System.currentTimeMillis() + "-" + (int)(Math.random() * 1000));
         }
         memoryIndex.put(item.getId(), item);
+
+        if (db.isPostgres()) {
+            try (Connection conn = db.getConnection();
+                 PreparedStatement ps = conn.prepareStatement(
+                     "INSERT INTO medications (id, profile_id, name, generic_name, dosage, frequency, timing, food_instruction, prescribed_for, doctor_name, remaining_days, total_pills, remaining_pills, taken_today, created_at) "
+                     + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+                     + "ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, generic_name = EXCLUDED.generic_name, dosage = EXCLUDED.dosage, "
+                     + "frequency = EXCLUDED.frequency, timing = EXCLUDED.timing, food_instruction = EXCLUDED.food_instruction, "
+                     + "remaining_days = EXCLUDED.remaining_days, total_pills = EXCLUDED.total_pills, remaining_pills = EXCLUDED.remaining_pills, taken_today = EXCLUDED.taken_today"
+                 )) {
+                ps.setString(1, item.getId());
+                ps.setString(2, item.getProfileId() != null ? item.getProfileId() : "user-arjun");
+                ps.setString(3, item.getName());
+                ps.setString(4, item.getGenericName());
+                ps.setString(5, item.getDosage());
+                ps.setString(6, item.getFrequency());
+                ps.setString(7, item.getTiming());
+                ps.setString(8, item.getFoodInstruction());
+                ps.setString(9, item.getPrescribedFor());
+                ps.setString(10, item.getDoctorName());
+                ps.setInt(11, item.getRemainingDays());
+                ps.setInt(12, item.getTotalPills());
+                ps.setInt(13, item.getRemainingPills());
+                ps.setBoolean(14, item.isTakenToday());
+                ps.setString(15, java.time.Instant.now().toString());
+                ps.executeUpdate();
+            } catch (Exception e) {
+                System.err.println("Postgres save medication error: " + e.getMessage());
+            }
+        }
+
         flushToDisk();
         return item;
     }
@@ -81,6 +146,16 @@ public class MedicationRepository {
         MedicationItem m = memoryIndex.get(id);
         if (m != null) {
             m.setTakenToday(!m.isTakenToday());
+            if (db.isPostgres()) {
+                try (Connection conn = db.getConnection();
+                     PreparedStatement ps = conn.prepareStatement("UPDATE medications SET taken_today = ? WHERE id = ?")) {
+                    ps.setBoolean(1, m.isTakenToday());
+                    ps.setString(2, id);
+                    ps.executeUpdate();
+                } catch (Exception e) {
+                    System.err.println("Postgres toggle medication error: " + e.getMessage());
+                }
+            }
             flushToDisk();
             return true;
         }
@@ -90,6 +165,15 @@ public class MedicationRepository {
     public synchronized boolean deleteById(String id) {
         MedicationItem removed = memoryIndex.remove(id);
         if (removed != null) {
+            if (db.isPostgres()) {
+                try (Connection conn = db.getConnection();
+                     PreparedStatement ps = conn.prepareStatement("DELETE FROM medications WHERE id = ?")) {
+                    ps.setString(1, id);
+                    ps.executeUpdate();
+                } catch (Exception e) {
+                    System.err.println("Postgres delete medication error: " + e.getMessage());
+                }
+            }
             flushToDisk();
             return true;
         }

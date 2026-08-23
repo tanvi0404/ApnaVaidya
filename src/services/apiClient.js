@@ -9,12 +9,21 @@
 import { PRELOADED_REPORTS } from '../data/reportsData';
 import { MEDICATIONS_DATA } from '../data/medicationsData';
 
+const RAW_ENV_URL = import.meta.env?.VITE_API_URL ? import.meta.env.VITE_API_URL.trim() : '';
+const CONFIGURED_API_URL = RAW_ENV_URL
+  ? (RAW_ENV_URL.endsWith('/api') ? RAW_ENV_URL : `${RAW_ENV_URL.replace(/\/+$/, '')}/api`)
+  : null;
+
 const DEFAULT_PORT_1 = 'http://localhost:8080/api';
 const DEFAULT_PORT_2 = 'http://localhost:8081/api';
-let activeBaseUrl = import.meta.env?.VITE_API_URL || DEFAULT_PORT_1;
+let activeBaseUrl = CONFIGURED_API_URL || DEFAULT_PORT_1;
 
 // Probe and determine live port
 async function getBaseUrl() {
+  if (CONFIGURED_API_URL) {
+    return CONFIGURED_API_URL;
+  }
+
   if (activeBaseUrl) {
     try {
       const res = await fetch(`${activeBaseUrl}/health`, { method: 'GET', headers: { 'Accept': 'application/json' } });

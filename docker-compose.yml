@@ -1,24 +1,49 @@
 version: '3.8'
 
 services:
-  apnavaidya:
+  # PostgreSQL Database Container
+  postgres:
+    image: postgres:16-alpine
+    container_name: apnavaidya_postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: apnavaidya
+      POSTGRES_USER: apnavaidya_user
+      POSTGRES_PASSWORD: apnavaidya_dev_password
+    volumes:
+      - apnavaidya_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U apnavaidya_user -d apnavaidya"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Java 17 Production REST API Backend
+  backend:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: apnavaidya_app
+    container_name: apnavaidya_backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
     ports:
-      - "8080:8080" # Java 17 REST API
-      - "3000:3000" # Web UI
+      - "8080:8080"
     environment:
       - NODE_ENV=production
-      - PORT=3000
-      - JWT_SECRET=ApnaVaidya_2026_Enterprise_Production_Secret_Key_98234!
-      - VAULT_ENCRYPTION_KEY=ApnaVaidya_2026_Enterprise_AES256_Vault_Key_Production_98234!
-      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173
+      - PORT=8080
+      - DATABASE_URL=postgresql://apnavaidya_user:apnavaidya_dev_password@postgres:5432/apnavaidya
+      - JWT_SECRET=ApnaVaidya_2026_Enterprise_Dev_Secret_98234!
+      - VAULT_ENCRYPTION_KEY=ApnaVaidya_2026_Enterprise_AES256_Key_98234!
+      - ALLOWED_ORIGINS=http://localhost:5173,http://localhost:3000,https://apnavaidya.vercel.app
     volumes:
       - apnavaidya_data:/app/server/data
-    restart: unless-stopped
 
 volumes:
+  apnavaidya_postgres_data:
+    driver: local
   apnavaidya_data:
     driver: local

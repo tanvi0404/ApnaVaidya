@@ -1,12 +1,13 @@
 # 🌿 ApnaVaidya (अपना वैद्य) — Personal AI Healthcare Platform
 
 > **Your Health, Understood.**  
-> A privacy-first personal healthcare decision-support platform featuring an on-device Neural OCR ingestion engine (`pdfjs-dist` + `tesseract.js`), multilingual clinical AI assistant, and a high-performance **Java 17 REST API Backend** running with AES-256 GCM encrypted persistence, SQL schema migrations, and an immutable SHA-256 audit ledger.
+> A privacy-first personal healthcare decision-support platform featuring on-device Neural OCR (`pdfjs-dist` + `tesseract.js`), multilingual clinical AI assistant, and a high-performance **Java 17 REST API Backend** running with **PostgreSQL JDBC persistence**, AES-256 GCM encrypted health records, automated DDL migrations, and an immutable SHA-256 audit ledger.
 
 [![CI Workflow](https://github.com/tanvi0404/ApnaVaidya/actions/workflows/ci.yml/badge.svg)](https://github.com/tanvi0404/ApnaVaidya/actions/workflows/ci.yml)
 [![Tests](https://img.shields.io/badge/Tests-27%2F27%20Passed-059669.svg)](https://github.com/tanvi0404/ApnaVaidya)
+[![Database](https://img.shields.io/badge/Database-PostgreSQL%20%2B%20JSON%20Fallback-336791.svg)](https://www.postgresql.org/)
 [![Security](https://img.shields.io/badge/Security-AES--256--GCM%20%2B%20PBKDF2-10B981.svg)](https://github.com/tanvi0404/ApnaVaidya)
-[![Java](https://img.shields.io/badge/Backend-Java%2017%20LTS-F43F5E.svg)](https://openjdk.org/projects/jdk/17/)
+[![Backend](https://img.shields.io/badge/Backend-Java%2017%20LTS-F43F5E.svg)](https://openjdk.org/projects/jdk/17/)
 [![Frontend](https://img.shields.io/badge/Frontend-React%2018%20%2B%20Vite%205-0284C7.svg)](https://react.dev/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-64748B.svg)](https://opensource.org/licenses/MIT)
 
@@ -17,27 +18,27 @@
 
 ## 🌐 Live Deployments
 
-| Platform | Deployment Target | Live Link |
-| :--- | :--- | :--- |
-| **🐳 Render** | **Full-Stack Container** (Java 17 REST API + React Web UI) | [`https://apna-vaidya.onrender.com`](https://dashboard.render.com) |
-| **⚡ Vercel** | **Edge CDN Web App** (On-Device OCR & UI Preview) | [`https://apnavaidya.vercel.app`](https://vercel.com) |
+| Platform | Deployment Target | Role | Live Link |
+| :--- | :--- | :--- | :--- |
+| **⚡ Vercel** | **Edge CDN Web App** | React 18 Frontend UI & On-Device OCR | [`https://apnavaidya.vercel.app`](https://apnavaidya.vercel.app) |
+| **🐳 Render** | **Docker Web Service** | Java 17 REST API + PostgreSQL | [`https://apna-vaidya-backend.onrender.com`](https://apna-vaidya-backend.onrender.com) |
 
 ---
 
 ## 📐 System Architecture
 
-### 1. Full-Stack Application Architecture
+### 1. Cloud-Native Production Topology
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
-│                   React 18 + Vite 5 Frontend (SPA)                     │
-│       Tailwind CSS • Lucide Icons • On-Demand Lazy Code-Splitting       │
+│               React 18 + Vite 5 Frontend SPA (Vercel)                  │
+│       Tailwind CSS • Lucide Icons • On-Device Neural OCR Worker        │
 └───────────────────────────────────┬────────────────────────────────────┘
                                     │
                   HTTPS REST + HMAC-SHA256 JWT Bearer
                                     │
                                     ▼
 ┌────────────────────────────────────────────────────────────────────────┐
-│                   Java 17 High-Throughput REST Engine                  │
+│           Java 17 High-Throughput REST Engine (Render / Docker)        │
 │       Multi-threaded HttpServer • 23 Endpoints (20/20 Shielded)        │
 ├───────────────────────────────────┬────────────────────────────────────┤
 │                                   │                                    │
@@ -52,10 +53,19 @@
 ├───────────────────────────────────┬────────────────────────────────────┤
 │                                   │                                    │
 │   🛡️ AES-256 GCM Vault            │   📜 SQL Schema Migrator           │
-│   • Encrypted Sensitive Data at Rest • Automatic DDL Startup (6 tables)│
-│   • Externalized Key (SHA-256)    │   • ReentrantReadWriteLock I/O     │
+│   • Encrypted Sensitive Data at Rest • Auto-migrates 6 tables on startup │
+│   • Externalized Key (SHA-256)    │   • PostgreSQL JDBC + Fallback I/O │
 │                                   │                                    │
-└───────────────────────────────────┴────────────────────────────────────┘
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │
+                 JDBC Connection (PostgreSQL 16)
+                                    │
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                  PostgreSQL Production Database (Render)               │
+│   users • family_profiles • medical_reports • medications • audit_logs │
+│   [Local Dev Fallback: Atomic File-Backed JSON in server/data/*.json]  │
+└────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### 2. Diagnostic Document & Clinical Data Pipeline
@@ -72,8 +82,31 @@
 [Multi-Model RAG & Clinical Engines (ASCVD Risk, IDRS, Organ Heatmap)]
                │
                ▼
-[AES-256 GCM Encrypted Persistence + Immutable SHA-256 Audit Log]
+[PostgreSQL Relational Persistence + AES-256 GCM Vault + Immutable Audit Log]
 ```
+
+---
+
+## 🗄️ Database Architecture: Local vs. Production
+
+ApnaVaidya utilizes a **Hybrid Relational Repository Architecture**:
+
+1. **Production (PostgreSQL via JDBC)**:
+   - When `DATABASE_URL` is configured (e.g. `postgresql://user:pass@host:5432/dbname`), `SchemaMigrator.java` automatically runs DDL migrations on startup to create and verify the 6 relational tables.
+   - All repository operations (`UserRepository`, `MedicalReportRepository`, `MedicationRepository`, `ComprehensiveHealthService`) execute parameterized SQL PreparedStatements against PostgreSQL.
+   - Sensitive fields (`passwordHash`, `salt`, `bloodGroup`, `address`) are transparently encrypted with **AES-256 GCM** before being written to PostgreSQL.
+
+2. **Local Development (Zero-Config JSON Fallback)**:
+   - If `DATABASE_URL` is empty, ApnaVaidya runs in local file-backed JSON mode under [`server/data/`](file:///c:/Users/tanvi/Desktop/ApnaVaidya/server/data/).
+   - Thread safety is maintained via `ReentrantReadWriteLock` and atomic file renames.
+
+### Relational Schema Overview (6 Tables)
+* **`users`**: Patient accounts, emails, mobile numbers, and AES-256 encrypted credentials/demographics.
+* **`family_profiles`**: Isolated family member records with constitutional metadata.
+* **`medical_reports`**: Diagnostic lab reports, OCR summaries, and extracted biomarker JSON arrays.
+* **`medications`**: Active prescriptions, dosages, frequencies, pill inventory, and daily adherence toggles.
+* **`audit_logs`**: Immutable security logs with chained SHA-256 cryptographic hashes.
+* **`clinical_prescriptions`**: NMC-compliant teleconsultation e-prescriptions with digital signatures.
 
 ---
 
@@ -116,39 +149,40 @@
 
 ---
 
-## 🏗️ Technical Stack Details
+## 🔑 Environment Variables Reference
 
-| Layer | Architecture & Technology |
-| :--- | :--- |
-| **Frontend UI** | React 18, Vite 5, Tailwind CSS, Lucide React Icons, Web Speech API |
-| **On-Device OCR** | `pdfjs-dist` (Text Layer Extraction), `tesseract.js` (Neural Image OCR) |
-| **Backend Engine** | Java 17 (OpenJDK), Multi-threaded `com.sun.net.httpserver.HttpServer` |
-| **Password Security** | NIST SP 800-132 PBKDF2-HMAC-SHA512 (100,000 rounds, 32-byte salt, constant-time verification) |
-| **Token Authority** | HMAC-SHA256 signed JSON Web Tokens (JWT) with 7-day expiration |
-| **Security at Rest** | Authenticated AES-256 GCM field encryption (`enc_aes256:`) with 12-byte random IVs |
-| **Database Architecture** | Concurrent File-backed JSON Database (`server/data/*.json`) + `SchemaMigrator` SQL DDL Layer |
-| **Data Access Pattern** | Custom Repository Pattern (`UserRepository`, `MedicalReportRepository`, `MedicationRepository`) |
-| **Testing Framework**| Vitest 4, `@testing-library/react`, `@testing-library/jest-dom`, Java 17 Suite (27/27 Tests) |
-| **Container & Cloud**| Docker Multi-Stage (`Dockerfile`), Docker Compose, Render (`render.yaml`), Vercel (`vercel.json`) |
+| Variable | Required | Description | Example / Default |
+| :--- | :---: | :--- | :--- |
+| `VITE_API_URL` | Production (Frontend) | URL of the Java backend REST API on Render | `https://apna-vaidya-backend.onrender.com` |
+| `DATABASE_URL` | Production (Backend) | PostgreSQL database connection string | `postgresql://user:pass@host:5432/apnavaidya` |
+| `JWT_SECRET` | Production (Backend) | 256-bit secret key for HMAC-SHA256 JWT tokens | Auto-generated or custom random string |
+| `VAULT_ENCRYPTION_KEY` | Production (Backend) | 256-bit secret key for AES-256 GCM encrypted fields | Auto-generated or custom random string |
+| `ALLOWED_ORIGINS` | Production (Backend) | Comma-separated list of allowed frontend origins | `https://apnavaidya.vercel.app,http://localhost:5173` |
+| `PORT` | Optional (Backend) | HTTP port to bind (auto-set by Render/Docker) | `8080` |
+| `GEMINI_API_KEY` | Optional | Google Gemini 1.5 Pro / Flash API key | `AIzaSy...` |
+| `OPENAI_API_KEY` | Optional | OpenAI GPT-4o API key | `sk-...` |
 
 ---
 
-## 🚀 Quickstart & Local Setup
+## 🚀 Local Development Setup
 
-### 1. Clone & Install
+### 1. Clone & Install Dependencies
 ```bash
 git clone https://github.com/tanvi0404/ApnaVaidya.git
 cd ApnaVaidya
 npm install
 ```
 
-### 2. Run the Automated Test Suite (27 Tests)
+### 2. Run with Docker Compose (PostgreSQL + Java Backend)
 ```bash
-npm run test:server    # Executes 16 Java 17 backend security & clinical tests
-npm test               # Executes 11 Vitest frontend component & calculator tests
+# Start PostgreSQL database and Java backend
+docker compose up -d
+
+# Start React Frontend
+npm run dev
 ```
 
-### 3. Start the Application
+### 3. Run Locally Without Docker (Zero-Config JSON Mode)
 ```bash
 # Terminal 1: Launch Java 17 REST API (Port 8080)
 npm run start:server
@@ -159,34 +193,51 @@ npm run dev
 
 Open **`http://localhost:5173/`** in your browser.
 
+### 4. Execute Full Automated Test Suite (27/27 Tests)
+```bash
+# Run Java 17 backend security & clinical test suite
+npm run test:server
+
+# Run React frontend Vitest suite
+npm test
+
+# Run all tests together
+npm run test:all
+```
+
 ---
 
-## 🧪 Automated Testing Matrix (`npm run test:server`)
+## ☁️ Cloud Deployment Guide
 
-```text
-==================================================
-🧪 Running ApnaVaidya Java 17 Test Suite
-==================================================
-  ✓ [PASS] ASCVD Risk Engine: 10.2% (INTERMEDIATE)
-  ✓ [PASS] IDRS Diabetes Engine: Boundary 0-100 Validated (100/100, 50/100)
-  ✓ [PASS] What-If Simulation: HbA1c -0.90%, LDL -18.3 mg/dL, SBP -10.8 mmHg
-  ✓ [PASS] Drug Pharmacovigilance: Detected 1 clinical safety warnings
-  ✓ [PASS] Cryptographic E-Prescription: Signature Verified
-  ✓ [PASS] DatabaseManager Atomic Persistence: File I/O Verified
-  ✓ [PASS] Persistence Round-Trip ID Integrity: Verified (Meds, Reports, Audit Logs)
-  ✓ [PASS] Cryptographic Password Hashing: PBKDF2-HMAC-SHA512 (100,000 Rounds) Verified
-  ✓ [PASS] Cryptographic JWT Tokens: HMAC-SHA256 Signature Verified
-  ✓ [PASS] Demo Auth Lockdown & Secret Externalization: Verified
-  ✓ [PASS] AES-256 GCM Cryptographic Vault: Field Encryption Verified
-  ✓ [PASS] Chikitsak AI & Clinical RAG: Emergency Intercept & ICMR Grounding Verified
-  ✓ [PASS] Ayurvedic Prakriti Engine: Vata (50% Vata, 30% Pitta, 20% Kapha)
-  ✓ [PASS] Pharmacogenomics (PGx) Matcher: Validated CPIC CYP2C19/Clopidogrel
-  ✓ [PASS] Longevity & Biological Age Engine: Score 96/100 (Bio-Age: 47.7 yrs)
-  ✓ [PASS] Schema Migrations & Relational Repository Engine: Verified 6 DDL Schemas, AES-256 Vault & Hardened JSON Parser
-==================================================
-🏁 Java 17 Tests: 16 Passed, 0 Failed (100% Green)
-==================================================
-```
+### A. Deploy Java Backend on Render
+
+1. Log in to [Render Dashboard](https://dashboard.render.com).
+2. Click **New +** ➔ **PostgreSQL Database**:
+   - Name: `apnavaidya-db`
+   - Database: `apnavaidya`
+   - User: `apnavaidya_user`
+   - Plan: Free
+3. Click **New +** ➔ **Web Service**:
+   - Connect your GitHub repository: `tanvi0404/ApnaVaidya`
+   - Environment: `Docker`
+   - Dockerfile Path: `./Dockerfile`
+   - Health Check Path: `/api/health`
+4. In **Environment Variables**, configure:
+   - `NODE_ENV`: `production`
+   - `DATABASE_URL`: Add from Database ➔ `apnavaidya-db` (Internal Database URL)
+   - `JWT_SECRET`: Generate a random 32-character secret
+   - `VAULT_ENCRYPTION_KEY`: Generate a random 32-character secret
+   - `ALLOWED_ORIGINS`: `https://your-app.vercel.app,http://localhost:5173`
+5. Click **Deploy Web Service**. Your backend will be live at `https://apna-vaidya-backend.onrender.com`.
+
+### B. Deploy React Frontend on Vercel
+
+1. Log in to [Vercel Dashboard](https://vercel.com).
+2. Click **Add New...** ➔ **Project** ➔ Import `tanvi0404/ApnaVaidya`.
+3. Framework Preset: **Vite** (Root Directory: `./`).
+4. In **Environment Variables**, add:
+   - `VITE_API_URL`: `https://apna-vaidya-backend.onrender.com` (Your Render backend URL)
+5. Click **Deploy**. Vercel will build the SPA and deploy it globally with full PWA and caching support!
 
 ---
 

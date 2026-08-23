@@ -30,16 +30,22 @@ public class ApnaVaidyaServer {
 
     public static void main(String[] args) {
         try {
-            // Phase 4: Run Database Schema Migrations
+            // Run Database Schema Migrations
             com.apnavaidya.storage.SchemaMigrator.runMigrations(System.getenv("DATABASE_URL"));
 
-            int port = PORT;
+            String envPort = System.getenv("PORT");
+            int defaultPort = PORT;
+            int port = (envPort != null && !envPort.trim().isEmpty()) ? Integer.parseInt(envPort.trim()) : defaultPort;
             HttpServer server;
             try {
                 server = HttpServer.create(new InetSocketAddress(port), 0);
             } catch (IOException e) {
-                port = 8081;
-                server = HttpServer.create(new InetSocketAddress(port), 0);
+                if (envPort == null || envPort.trim().isEmpty()) {
+                    port = 8081;
+                    server = HttpServer.create(new InetSocketAddress(port), 0);
+                } else {
+                    throw e;
+                }
             }
 
             final int boundPort = server.getAddress().getPort();
@@ -158,6 +164,27 @@ public class ApnaVaidyaServer {
                         diagnosis.isEmpty() ? "Mild Dyslipidemia & Vitamin D Deficiency" : diagnosis,
                         rxList
                     );
+
+                    if (DatabaseManager.getInstance().isPostgres()) {
+                        try (java.sql.Connection conn = DatabaseManager.getInstance().getConnection();
+                             java.sql.PreparedStatement ps = conn.prepareStatement(
+                                 "INSERT INTO clinical_prescriptions (prescription_id, doctor_name, doctor_reg, patient_name, diagnosis, digital_signature, signing_timestamp, status) "
+                                 + "VALUES (?, ?, ?, ?, ?, ?, ?, ?) "
+                                 + "ON CONFLICT (prescription_id) DO NOTHING"
+                             )) {
+                            ps.setString(1, (String) rx.get("prescriptionId"));
+                            ps.setString(2, (String) rx.get("doctorName"));
+                            ps.setString(3, (String) rx.get("doctorReg"));
+                            ps.setString(4, (String) rx.get("patientName"));
+                            ps.setString(5, (String) rx.get("diagnosis"));
+                            ps.setString(6, (String) rx.get("digitalSignature"));
+                            ps.setString(7, (String) rx.get("signingTimestamp"));
+                            ps.setString(8, (String) rx.get("status"));
+                            ps.executeUpdate();
+                        } catch (Exception e) {
+                            System.err.println("Postgres save prescription error: " + e.getMessage());
+                        }
+                    }
 
                     String json = String.format(
                         "{\"prescriptionId\":\"%s\",\"doctorName\":\"%s\",\"patientName\":\"%s\",\"digitalSignature\":\"%s\",\"signingTimestamp\":\"%s\",\"status\":\"%s\"}",

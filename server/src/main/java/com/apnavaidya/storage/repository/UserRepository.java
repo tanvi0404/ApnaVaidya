@@ -3,11 +3,15 @@ package com.apnavaidya.storage.repository;
 import com.apnavaidya.storage.DatabaseManager;
 import com.apnavaidya.storage.JsonUtil;
 
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Phase 4 & Phase 6: Thread-Safe User Repository with AES-256 GCM Field Encryption at Rest
+ * Thread-Safe User Repository supporting PostgreSQL Relational Database with Local JSON Fallback.
+ * All sensitive fields (passwordHash, salt, bloodGroup, address) are transparently AES-256 GCM encrypted at rest.
  */
 public class UserRepository {
 
@@ -73,6 +77,36 @@ public class UserRepository {
     }
 
     private synchronized void loadAll() {
+        if (db.isPostgres()) {
+            try (Connection conn = db.getConnection();
+                 PreparedStatement ps = conn.prepareStatement("SELECT * FROM users");
+                 ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    String id = rs.getString("id");
+                    UserEntity user = new UserEntity(
+                        id,
+                        rs.getString("name"),
+                        rs.getString("email"),
+                        rs.getString("mobile"),
+                        DatabaseManager.decryptField(rs.getString("password_hash")),
+                        DatabaseManager.decryptField(rs.getString("salt")),
+                        rs.getInt("age"),
+                        rs.getString("gender"),
+                        rs.getString("place"),
+                        DatabaseManager.decryptField(rs.getString("address")),
+                        DatabaseManager.decryptField(rs.getString("blood_group")),
+                        rs.getString("diet_preference"),
+                        rs.getString("created_at")
+                    );
+                    memoryIndex.put(id, user);
+                }
+                return;
+            } catch (Exception e) {
+                System.err.println("Postgres users load error: " + e.getMessage() + ", falling back to local storage.");
+            }
+        }
+
+        // Local JSON fallback
         String json = db.loadTableData("users");
         if (json != null && !json.trim().isEmpty()) {
             List<String> objects = JsonUtil.extractJsonObjects(json);
@@ -80,24 +114,18 @@ public class UserRepository {
                 String id = JsonUtil.extractString(obj, "id");
                 if (id == null || id.isEmpty()) continue;
 
-                // Transparent AES-256 GCM Decryption on read
-                String rawHash = JsonUtil.extractString(obj, "passwordHash");
-                String rawSalt = JsonUtil.extractString(obj, "salt");
-                String rawAddress = JsonUtil.extractString(obj, "address");
-                String rawBloodGroup = JsonUtil.extractString(obj, "bloodGroup");
-
                 UserEntity user = new UserEntity(
                     id,
                     JsonUtil.extractString(obj, "name"),
                     JsonUtil.extractString(obj, "email"),
                     JsonUtil.extractString(obj, "mobile"),
-                    DatabaseManager.decryptField(rawHash),
-                    DatabaseManager.decryptField(rawSalt),
+                    DatabaseManager.decryptField(JsonUtil.extractString(obj, "passwordHash")),
+                    DatabaseManager.decryptField(JsonUtil.extractString(obj, "salt")),
                     JsonUtil.extractInt(obj, "age", 30),
                     JsonUtil.extractString(obj, "gender"),
                     JsonUtil.extractString(obj, "place"),
-                    DatabaseManager.decryptField(rawAddress),
-                    DatabaseManager.decryptField(rawBloodGroup),
+                    DatabaseManager.decryptField(JsonUtil.extractString(obj, "address")),
+                    DatabaseManager.decryptField(JsonUtil.extractString(obj, "bloodGroup")),
                     JsonUtil.extractString(obj, "dietPreference"),
                     JsonUtil.extractString(obj, "createdAt")
                 );
@@ -146,6 +174,42 @@ public class UserRepository {
             );
         }
         memoryIndex.put(user.getId(), user);
+
+        // Encrypted field persistence
+        String encHash = DatabaseManager.encryptField(user.getPasswordHash());
+        String encSalt = DatabaseManager.encryptField(user.getSalt());
+        String encAddress = DatabaseManager.encryptField(user.getAddress());
+        String encBloodGroup = DatabaseManager.encryptField(user.getBloodGroup());
+
+        if (db.isPostgres()) {
+            try (Connection conn = db.getConnection();
+                 PreparedStatement ps = conn.prepareStatement(
+                     "INSERT INTO users (id, name, email, mobile, password_hash, salt, age, gender, place, address, blood_group, diet_preference, created_at) "
+                     + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+                     + "ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, email = EXCLUDED.email, mobile = EXCLUDED.mobile, "
+                     + "password_hash = EXCLUDED.password_hash, salt = EXCLUDED.salt, age = EXCLUDED.age, gender = EXCLUDED.gender, "
+                     + "place = EXCLUDED.place, address = EXCLUDED.address, blood_group = EXCLUDED.blood_group, diet_preference = EXCLUDED.diet_preference"
+                 )) {
+                ps.setString(1, user.getId());
+                ps.setString(2, user.getName());
+                ps.setString(3, user.getEmail());
+                ps.setString(4, user.getMobile());
+                ps.setString(5, encHash);
+                ps.setString(6, encSalt);
+                ps.setInt(7, user.getAge());
+                ps.setString(8, user.getGender());
+                ps.setString(9, user.getPlace());
+                ps.setString(10, encAddress);
+                ps.setString(11, encBloodGroup);
+                ps.setString(12, user.getDietPreference());
+                ps.setString(13, user.getCreatedAt());
+                ps.executeUpdate();
+            } catch (Exception e) {
+                System.err.println("Postgres save user error: " + e.getMessage());
+            }
+        }
+
+        // Local cache sync
         flushToDisk();
         return user;
     }
@@ -155,7 +219,6 @@ public class UserRepository {
         List<UserEntity> list = new ArrayList<>(memoryIndex.values());
         for (int i = 0; i < list.size(); i++) {
             UserEntity u = list.get(i);
-            // Transparent AES-256 GCM Encryption on write
             String encHash = DatabaseManager.encryptField(u.getPasswordHash());
             String encSalt = DatabaseManager.encryptField(u.getSalt());
             String encAddress = DatabaseManager.encryptField(u.getAddress());
