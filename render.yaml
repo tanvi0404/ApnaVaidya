@@ -1,8 +1,8 @@
 services:
   # ApnaVaidya Java 17 Production REST API Backend
   - type: web
-    name: apna-vaidya-backend
-    env: docker
+    name: apna-vaidya
+    runtime: docker
     plan: free
     region: oregon
     dockerfilePath: ./Dockerfile

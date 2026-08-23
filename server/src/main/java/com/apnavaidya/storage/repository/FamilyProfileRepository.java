@@ -36,6 +36,7 @@ public class FamilyProfileRepository {
                             String id = rs.getString("id");
                             FamilyProfile profile = new FamilyProfile(
                                 id,
+                                rs.getString("user_id"),
                                 rs.getString("name"),
                                 rs.getString("relationship"),
                                 rs.getInt("age"),
@@ -74,6 +75,7 @@ public class FamilyProfileRepository {
                 if (id == null || id.isEmpty()) continue;
                 FamilyProfile profile = new FamilyProfile(
                     id,
+                    JsonUtil.extractString(obj, "userId", "user-default"),
                     JsonUtil.extractString(obj, "name"),
                     JsonUtil.extractString(obj, "relationship"),
                     JsonUtil.extractInt(obj, "age", 30),
@@ -97,13 +99,28 @@ public class FamilyProfileRepository {
         return new ArrayList<>(memoryIndex.values());
     }
 
+    public List<FamilyProfile> findByUserId(String userId) {
+        List<FamilyProfile> results = new ArrayList<>();
+        for (FamilyProfile p : memoryIndex.values()) {
+            if (userId != null && userId.equalsIgnoreCase(p.getUserId())) {
+                results.add(p);
+            }
+        }
+        return results;
+    }
+
     public Optional<FamilyProfile> findById(String id) {
         return Optional.ofNullable(memoryIndex.get(id));
     }
 
-    public synchronized FamilyProfile save(FamilyProfile profile) {
+    public synchronized FamilyProfile save(FamilyProfile profile, String userId) {
         if (profile.getId() == null || profile.getId().isEmpty()) {
             profile.setId("profile-" + System.currentTimeMillis());
+        }
+        if (userId != null && !userId.isEmpty()) {
+            profile.setUserId(userId);
+        } else if (profile.getUserId() == null || profile.getUserId().isEmpty()) {
+            profile.setUserId("user-default");
         }
         memoryIndex.put(profile.getId(), profile);
 
@@ -115,12 +132,12 @@ public class FamilyProfileRepository {
                     try (PreparedStatement ps = conn.prepareStatement(
                         "INSERT INTO family_profiles (id, user_id, name, relationship, age, gender, blood_group, weight, bmi, avatar_initials, avatar_color, conditions_json, allergies_json, goals_json, diet_preference, created_at) "
                         + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
-                        + "ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, relationship = EXCLUDED.relationship, age = EXCLUDED.age, "
+                        + "ON CONFLICT (id) DO UPDATE SET user_id = EXCLUDED.user_id, name = EXCLUDED.name, relationship = EXCLUDED.relationship, age = EXCLUDED.age, "
                         + "gender = EXCLUDED.gender, blood_group = EXCLUDED.blood_group, weight = EXCLUDED.weight, bmi = EXCLUDED.bmi, "
                         + "avatar_initials = EXCLUDED.avatar_initials, avatar_color = EXCLUDED.avatar_color, diet_preference = EXCLUDED.diet_preference"
                     )) {
                         ps.setString(1, profile.getId());
-                        ps.setString(2, "user-arjun");
+                        ps.setString(2, profile.getUserId());
                         ps.setString(3, profile.getName());
                         ps.setString(4, profile.getRelationship());
                         ps.setInt(5, profile.getAge());
@@ -151,14 +168,19 @@ public class FamilyProfileRepository {
         return profile;
     }
 
+    public synchronized FamilyProfile save(FamilyProfile profile) {
+        return save(profile, profile.getUserId());
+    }
+
     private void flushToDisk() {
         StringBuilder sb = new StringBuilder("[");
         List<FamilyProfile> list = new ArrayList<>(memoryIndex.values());
         for (int i = 0; i < list.size(); i++) {
             FamilyProfile p = list.get(i);
             sb.append(String.format(
-                "{\"id\":\"%s\",\"name\":\"%s\",\"relationship\":\"%s\",\"age\":%d,\"gender\":\"%s\",\"bloodGroup\":\"%s\",\"weight\":\"%s\",\"bmi\":%.1f,\"avatarInitials\":\"%s\",\"avatarColor\":\"%s\",\"dietPreference\":\"%s\"}",
+                "{\"id\":\"%s\",\"userId\":\"%s\",\"name\":\"%s\",\"relationship\":\"%s\",\"age\":%d,\"gender\":\"%s\",\"bloodGroup\":\"%s\",\"weight\":\"%s\",\"bmi\":%.1f,\"avatarInitials\":\"%s\",\"avatarColor\":\"%s\",\"dietPreference\":\"%s\"}",
                 JsonUtil.escapeJson(p.getId()),
+                JsonUtil.escapeJson(p.getUserId() != null ? p.getUserId() : "user-default"),
                 JsonUtil.escapeJson(p.getName()),
                 JsonUtil.escapeJson(p.getRelationship()),
                 p.getAge(),

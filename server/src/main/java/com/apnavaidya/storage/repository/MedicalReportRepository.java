@@ -128,7 +128,7 @@ public class MedicalReportRepository {
                         + "test_date = EXCLUDED.test_date, status = EXCLUDED.status, summary_text = EXCLUDED.summary_text, ocr_confidence = EXCLUDED.ocr_confidence"
                     )) {
                         ps.setString(1, report.getId());
-                        ps.setString(2, report.getProfileId() != null ? report.getProfileId() : "user-arjun");
+                        ps.setString(2, report.getProfileId() != null ? report.getProfileId() : "user-default");
                         ps.setString(3, report.getTitle());
                         ps.setString(4, report.getCategory());
                         ps.setString(5, report.getLabName());
@@ -190,7 +190,7 @@ public class MedicalReportRepository {
             sb.append(String.format(
                 "{\"id\":\"%s\",\"profileId\":\"%s\",\"title\":\"%s\",\"labName\":\"%s\",\"testDate\":\"%s\",\"category\":\"%s\",\"ocrConfidence\":\"%s\",\"overallSummary\":\"%s\",\"badgeCount\":\"%s\",\"status\":\"%s\"}",
                 JsonUtil.escapeJson(r.getId()),
-                JsonUtil.escapeJson(r.getProfileId() != null ? r.getProfileId() : "user-arjun"),
+                JsonUtil.escapeJson(r.getProfileId() != null ? r.getProfileId() : "user-default"),
                 JsonUtil.escapeJson(r.getTitle()),
                 JsonUtil.escapeJson(r.getLabName()),
                 JsonUtil.escapeJson(r.getDate()),

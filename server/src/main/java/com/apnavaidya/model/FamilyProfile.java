@@ -4,6 +4,7 @@ import java.util.List;
 
 public class FamilyProfile {
     private String id;
+    private String userId;
     private String name;
     private String relationship;
     private int age;
@@ -24,7 +25,15 @@ public class FamilyProfile {
                          String bloodGroup, String weight, double bmi, String avatarInitials, 
                          String avatarColor, List<String> conditions, List<String> allergies, 
                          List<String> goals, String dietPreference) {
+        this(id, "user-default", name, relationship, age, gender, bloodGroup, weight, bmi, avatarInitials, avatarColor, conditions, allergies, goals, dietPreference);
+    }
+
+    public FamilyProfile(String id, String userId, String name, String relationship, int age, String gender, 
+                         String bloodGroup, String weight, double bmi, String avatarInitials, 
+                         String avatarColor, List<String> conditions, List<String> allergies, 
+                         List<String> goals, String dietPreference) {
         this.id = id;
+        this.userId = userId;
         this.name = name;
         this.relationship = relationship;
         this.age = age;
@@ -39,6 +48,9 @@ public class FamilyProfile {
         this.goals = goals;
         this.dietPreference = dietPreference;
     }
+
+    public String getUserId() { return userId; }
+    public void setUserId(String userId) { this.userId = userId; }
 
     // Getters and Setters
     public String getId() { return id; }

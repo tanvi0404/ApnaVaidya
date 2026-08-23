@@ -308,7 +308,7 @@ public class ApnaVaidyaServer {
 
                 if ("GET".equalsIgnoreCase(exchange.getRequestMethod())) {
                     String query = exchange.getRequestURI().getQuery();
-                    String profileId = "user-arjun";
+                    String profileId = getAuthenticatedUserId(exchange);
                     if (query != null && query.contains("profileId=")) {
                         profileId = query.split("profileId=")[1].split("&")[0];
                     }
@@ -398,7 +398,7 @@ public class ApnaVaidyaServer {
 
                 if ("GET".equalsIgnoreCase(exchange.getRequestMethod())) {
                     String query = exchange.getRequestURI().getQuery();
-                    String profileId = "user-arjun";
+                    String profileId = getAuthenticatedUserId(exchange);
                     if (query != null && query.contains("profileId=")) {
                         profileId = query.split("profileId=")[1].split("&")[0];
                     }
@@ -555,11 +555,14 @@ public class ApnaVaidyaServer {
 
                 if ("GET".equalsIgnoreCase(method)) {
                     String query = exchange.getRequestURI().getQuery();
-                    String profileId = "user-arjun";
+                    String profileId = getAuthenticatedUserId(exchange);
                     if (query != null && query.contains("profileId=")) {
                         profileId = query.split("profileId=")[1].split("&")[0];
                     }
                     List<MedicationItem> meds = medicationService.getMedicationsByProfile(profileId);
+                    if (meds.isEmpty() && ("user-arjun".equals(profileId) || "all".equals(profileId))) {
+                        meds = medicationService.getAllMedications();
+                    }
                     StringBuilder sb = new StringBuilder("[");
                     for (int i = 0; i < meds.size(); i++) {
                         sb.append(medicationToJson(meds.get(i)));
@@ -572,6 +575,82 @@ public class ApnaVaidyaServer {
                     String medId = extractJsonString(body, "medId");
                     boolean success = medicationService.toggleMedicationStatus(medId);
                     sendResponse(exchange, 200, "{\"success\":" + success + ",\"medId\":\"" + escapeJson(medId) + "\"}");
+                } else {
+                    sendResponse(exchange, 405, "{\"error\":\"Method Not Allowed\"}");
+                }
+            });
+
+            // Family Profiles Endpoint (Protected)
+            server.createContext("/api/profiles", exchange -> {
+                setCorsHeaders(exchange);
+                String method = exchange.getRequestMethod();
+
+                if ("OPTIONS".equalsIgnoreCase(method)) {
+                    sendResponse(exchange, 204, "");
+                    return;
+                }
+
+                if (!isAuthorized(exchange)) {
+                    sendResponse(exchange, 401, "{\"error\":\"Unauthorized: Valid HMAC-SHA256 JWT Bearer token required\"}");
+                    return;
+                }
+
+                String authUserId = getAuthenticatedUserId(exchange);
+
+                if ("GET".equalsIgnoreCase(method)) {
+                    List<FamilyProfile> profiles = familyProfileRepository.findByUserId(authUserId);
+                    if (profiles.isEmpty() && "user-arjun".equals(authUserId)) {
+                        profiles = familyProfileRepository.findAll();
+                    }
+                    StringBuilder sb = new StringBuilder("[");
+                    for (int i = 0; i < profiles.size(); i++) {
+                        FamilyProfile p = profiles.get(i);
+                        sb.append(String.format(
+                            Locale.US,
+                            "{\"id\":\"%s\",\"userId\":\"%s\",\"name\":\"%s\",\"relationship\":\"%s\",\"age\":%d,\"gender\":\"%s\",\"bloodGroup\":\"%s\",\"weight\":\"%s\",\"bmi\":%.1f,\"avatarInitials\":\"%s\",\"avatarColor\":\"%s\",\"dietPreference\":\"%s\"}",
+                            escapeJson(p.getId()), escapeJson(p.getUserId()), escapeJson(p.getName()),
+                            escapeJson(p.getRelationship()), p.getAge(), escapeJson(p.getGender()),
+                            escapeJson(p.getBloodGroup()), escapeJson(p.getWeight()), p.getBmi(),
+                            escapeJson(p.getAvatarInitials()), escapeJson(p.getAvatarColor()),
+                            escapeJson(p.getDietPreference())
+                        ));
+                        if (i < profiles.size() - 1) sb.append(",");
+                    }
+                    sb.append("]");
+                    sendResponse(exchange, 200, sb.toString());
+                } else if ("POST".equalsIgnoreCase(method)) {
+                    String body = readBody(exchange);
+                    String id = extractJsonString(body, "id");
+                    String name = extractJsonString(body, "name");
+                    String relationship = extractJsonString(body, "relationship");
+                    int age = extractJsonInt(body, "age", 30);
+                    String gender = extractJsonString(body, "gender");
+                    String bloodGroup = extractJsonString(body, "bloodGroup");
+                    String weight = extractJsonString(body, "weight");
+                    double bmi = extractJsonDouble(body, "bmi", 22.0);
+                    String initials = extractJsonString(body, "avatarInitials");
+                    String color = extractJsonString(body, "avatarColor");
+                    String diet = extractJsonString(body, "dietPreference");
+
+                    FamilyProfile profile = new FamilyProfile(
+                        id.isEmpty() ? "profile-" + System.currentTimeMillis() : id,
+                        authUserId,
+                        name.isEmpty() ? "Family Member" : name,
+                        relationship.isEmpty() ? "Dependent" : relationship,
+                        age,
+                        gender.isEmpty() ? "Other" : gender,
+                        bloodGroup.isEmpty() ? "O+" : bloodGroup,
+                        weight.isEmpty() ? "65 kg" : weight,
+                        bmi,
+                        initials.isEmpty() ? "FM" : initials,
+                        color.isEmpty() ? "emerald" : color,
+                        Collections.emptyList(),
+                        Collections.emptyList(),
+                        Collections.emptyList(),
+                        diet.isEmpty() ? "Balanced" : diet
+                    );
+                    familyProfileRepository.save(profile, authUserId);
+                    sendResponse(exchange, 200, "{\"success\":true,\"id\":\"" + escapeJson(profile.getId()) + "\"}");
                 } else {
                     sendResponse(exchange, 405, "{\"error\":\"Method Not Allowed\"}");
                 }
@@ -668,8 +747,18 @@ public class ApnaVaidyaServer {
                     return;
                 }
 
+                String authUserId = getAuthenticatedUserId(exchange);
+
                 if ("GET".equalsIgnoreCase(method)) {
-                    List<MedicalReport> reports = reportService.getAllReports();
+                    String query = exchange.getRequestURI().getQuery();
+                    String profileId = authUserId;
+                    if (query != null && query.contains("profileId=")) {
+                        profileId = query.split("profileId=")[1].split("&")[0];
+                    }
+                    List<MedicalReport> reports = reportService.getReportsByProfile(profileId);
+                    if (reports.isEmpty() && ("user-arjun".equals(profileId) || "all".equals(profileId))) {
+                        reports = reportService.getAllReports();
+                    }
                     StringBuilder sb = new StringBuilder("[");
                     for (int i = 0; i < reports.size(); i++) {
                         MedicalReport r = reports.get(i);
@@ -680,16 +769,22 @@ public class ApnaVaidyaServer {
                     sendResponse(exchange, 200, sb.toString());
                 } else if ("POST".equalsIgnoreCase(method)) {
                     String body = readBody(exchange);
-                    // Simple parse and store
+                    String title = extractJsonString(body, "title");
+                    String labName = extractJsonString(body, "labName");
+                    String category = extractJsonString(body, "category");
+                    String date = extractJsonString(body, "testDate");
+                    String ocrConf = extractJsonString(body, "ocrConfidence");
+                    String summary = extractJsonString(body, "overallSummary");
+
                     MedicalReport rep = new MedicalReport(
                         "rep-" + System.currentTimeMillis(),
-                        "user-arjun",
-                        "Newly Analyzed Blood Diagnostic Report",
-                        "NABL Accredited Clinical Laboratory",
-                        "Today",
-                        "General Diagnostics",
-                        "99.2% OCR Confidence",
-                        "All biomarkers parsed into structured electronic health format.",
+                        authUserId,
+                        title.isEmpty() ? "Newly Analyzed Diagnostic Report" : title,
+                        labName.isEmpty() ? "NABL Accredited Clinical Laboratory" : labName,
+                        date.isEmpty() ? "Today" : date,
+                        category.isEmpty() ? "General Diagnostics" : category,
+                        ocrConf.isEmpty() ? "99.2% OCR Confidence" : ocrConf,
+                        summary.isEmpty() ? "All biomarkers parsed into structured electronic health format." : summary,
                         Collections.emptyList()
                     );
                     reportService.addReport(rep);
@@ -990,6 +1085,18 @@ public class ApnaVaidyaServer {
         String token = authHeader.substring(7).trim();
         Map<String, String> claims = AuthSecurityService.verifyJwtToken(token);
         return claims != null && claims.containsKey("sub");
+    }
+
+    private static String getAuthenticatedUserId(HttpExchange exchange) {
+        String authHeader = exchange.getRequestHeaders().getFirst("Authorization");
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            String token = authHeader.substring(7).trim();
+            Map<String, String> claims = AuthSecurityService.verifyJwtToken(token);
+            if (claims != null && claims.containsKey("sub")) {
+                return claims.get("sub");
+            }
+        }
+        return "user-default";
     }
 
     private static void setCorsHeaders(HttpExchange exchange) {

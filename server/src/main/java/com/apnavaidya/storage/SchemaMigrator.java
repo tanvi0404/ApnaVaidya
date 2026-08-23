@@ -125,7 +125,8 @@ public class SchemaMigrator {
             }
             System.out.println("✅ SchemaMigrator: All 6 PostgreSQL database tables initialized successfully.");
         } catch (Exception e) {
-            System.err.println("⚠️ SchemaMigrator notice: " + e.getMessage() + " (falling back to atomic file-backed storage)");
+            System.err.println("❌ SchemaMigrator Error: Failed to execute schema migrations on PostgreSQL: " + e.getMessage());
+            throw new RuntimeException("CRITICAL STARTUP ERROR: PostgreSQL schema migration failed with DATABASE_URL configured: " + e.getMessage(), e);
         }
     }
 

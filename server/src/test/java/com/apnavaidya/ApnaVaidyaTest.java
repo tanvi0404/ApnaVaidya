@@ -429,6 +429,24 @@ public class ApnaVaidyaTest {
             rxRepo.save(testRx);
             assert rxRepo.findById("rx-test-01").isPresent() : "Clinical prescription must be queryable";
 
+            // Test Multi-User Family Profile Isolation
+            com.apnavaidya.model.FamilyProfile userAProfile = new com.apnavaidya.model.FamilyProfile(
+                "profile-user-a-01", "user-101", "Aarav Sharma", "Son", 16, "Male", "A+", "58 kg", 20.1,
+                "AS", "blue", Collections.emptyList(), Collections.emptyList(), Collections.emptyList(), "Vegetarian"
+            );
+            com.apnavaidya.model.FamilyProfile userBProfile = new com.apnavaidya.model.FamilyProfile(
+                "profile-user-b-01", "user-202", "Priya Verma", "Daughter", 14, "Female", "O+", "48 kg", 19.2,
+                "PV", "purple", Collections.emptyList(), Collections.emptyList(), Collections.emptyList(), "Balanced"
+            );
+            famRepo.save(userAProfile, "user-101");
+            famRepo.save(userBProfile, "user-202");
+
+            List<com.apnavaidya.model.FamilyProfile> userAProfiles = famRepo.findByUserId("user-101");
+            List<com.apnavaidya.model.FamilyProfile> userBProfiles = famRepo.findByUserId("user-202");
+            assert userAProfiles.size() >= 1 : "User 101 must have their own family profiles";
+            assert userBProfiles.size() >= 1 : "User 202 must have their own family profiles";
+            assert !userAProfiles.get(0).getId().equals(userBProfiles.get(0).getId()) : "Users must have isolated family data";
+
             // Test PostgreSQL JDBC URL Parser & URL-Decoded Credentials
             String rawRenderPgUrl = "postgres://apna_user:Secret%40Pass%23123@dpg-c12345-a.oregon-postgres.render.com:5432/apna_db";
             String convertedJdbc = com.apnavaidya.storage.DatabaseManager.toJdbcUrl(rawRenderPgUrl);
@@ -438,7 +456,16 @@ public class ApnaVaidyaTest {
             assert "Secret@Pass#123".equals(parsedProps.getProperty("password")) : "Must URL-decode password containing special chars (@, #)";
             assert "require".equals(parsedProps.getProperty("sslmode")) : "Must enforce SSL for cloud postgres";
 
-            System.out.printf("  ✓ [PASS] Schema Migrations & Relational Repository Engine: Verified 6 Relational Repositories, Connection Pool & URL-Decoded Credentials%n");
+            // Test SchemaMigrator Critical Error Throwing on Invalid Database URL
+            boolean threwStartupException = false;
+            try {
+                com.apnavaidya.storage.SchemaMigrator.runMigrations("postgres://invalid_user:invalid_pass@127.0.0.1:9999/nonexistent_db");
+            } catch (RuntimeException e) {
+                threwStartupException = true;
+            }
+            assert threwStartupException : "SchemaMigrator must throw RuntimeException and stop startup if DATABASE_URL is unreachable";
+
+            System.out.printf("  ✓ [PASS] Schema Migrations & Relational Repository Engine: Verified 6 Relational Repositories, User Isolation & Production DB Failure Safeguards%n");
             passed++;
         } catch (Throwable t) {
             System.err.println("  ✗ [FAIL] Schema Migrations & Relational Repository Engine: " + t.getMessage());

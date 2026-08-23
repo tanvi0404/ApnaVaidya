@@ -73,7 +73,7 @@ public class MedicationRepository {
                 }
                 MedicationItem item = new MedicationItem(
                     id,
-                    JsonUtil.extractString(obj, "profileId", "user-arjun"),
+                    JsonUtil.extractString(obj, "profileId", "user-default"),
                     JsonUtil.extractString(obj, "name"),
                     JsonUtil.extractString(obj, "genericName"),
                     JsonUtil.extractString(obj, "dosage"),
@@ -129,7 +129,7 @@ public class MedicationRepository {
                         + "remaining_days = EXCLUDED.remaining_days, total_pills = EXCLUDED.total_pills, remaining_pills = EXCLUDED.remaining_pills, taken_today = EXCLUDED.taken_today"
                     )) {
                         ps.setString(1, item.getId());
-                        ps.setString(2, item.getProfileId() != null ? item.getProfileId() : "user-arjun");
+                        ps.setString(2, item.getProfileId() != null ? item.getProfileId() : "user-default");
                         ps.setString(3, item.getName());
                         ps.setString(4, item.getGenericName());
                         ps.setString(5, item.getDosage());
@@ -223,7 +223,7 @@ public class MedicationRepository {
             sb.append(String.format(
                 "{\"id\":\"%s\",\"profileId\":\"%s\",\"name\":\"%s\",\"genericName\":\"%s\",\"dosage\":\"%s\",\"frequency\":\"%s\",\"timing\":\"%s\",\"foodInstruction\":\"%s\",\"prescribedFor\":\"%s\",\"doctorName\":\"%s\",\"remainingDays\":%d,\"totalPills\":%d,\"remainingPills\":%d,\"takenToday\":%b}",
                 JsonUtil.escapeJson(m.getId()),
-                JsonUtil.escapeJson(m.getProfileId() != null ? m.getProfileId() : "user-arjun"),
+                JsonUtil.escapeJson(m.getProfileId() != null ? m.getProfileId() : "user-default"),
                 JsonUtil.escapeJson(m.getName()),
                 JsonUtil.escapeJson(m.getGenericName()),
                 JsonUtil.escapeJson(m.getDosage()),

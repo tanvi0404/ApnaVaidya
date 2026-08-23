@@ -22,23 +22,25 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 /**
  * ApnaVaidya Enterprise Persistence & Cryptographic Vault Layer
  * Features:
- * 1. Real Thread-Safe PostgreSQL Connection Pool (Max 10 connections, auto-recycling & validation)
- * 2. Robust URL Normalization & URL-Decoded Credential Handling for Render / Supabase / Neon / AWS RDS
- * 3. AES-256 GCM authenticated encryption at rest for sensitive health records and PII (derived via SHA-256)
- * 4. Zero-dependency file-backed JSON fallback for local development when DATABASE_URL is not set
+ * 1. Strict PostgreSQL Connection Pool (Strictly capped at MAX_POOL_SIZE = 10, thread-safe, auto-recycling & validation)
+ * 2. Mandatory PostgreSQL in production when DATABASE_URL is set (Throws critical startup exception if unreachable, NO silent fallback)
+ * 3. Mandatory VAULT_ENCRYPTION_KEY in production with SHA-256 key derivation (Fails startup if missing in production)
+ * 4. Robust URL-Decoded Credential Normalization for Render / Supabase / Neon / AWS RDS
+ * 5. AES-256 GCM authenticated encryption at rest for sensitive health records and PII
+ * 6. Zero-dependency file-backed JSON fallback exclusively for local development
  */
 public class DatabaseManager {
 
     private static final String DATA_DIR = "server/data";
     private static final int GCM_TAG_LENGTH = 128;
     private static final int GCM_IV_LENGTH = 12;
-    private static final int MAX_POOL_SIZE = 10;
+    public static final int MAX_POOL_SIZE = 10;
 
     private static DatabaseManager instance;
     private final Path dataPath;
     private final ConcurrentHashMap<String, ReentrantReadWriteLock> tableLocks = new ConcurrentHashMap<>();
     
-    // PostgreSQL Connection Pooling
+    // Strict PostgreSQL Connection Pooling
     private boolean postgresConnected = false;
     private String cleanJdbcUrl = null;
     private Properties dbProps = null;
@@ -61,23 +63,31 @@ public class DatabaseManager {
                 this.dbProps = parseConnectionProperties(dbUrl);
                 this.cleanJdbcUrl = toJdbcUrl(dbUrl);
 
-                // Pre-warm initial pool connection to verify database connectivity
                 try {
                     Class.forName("org.postgresql.Driver");
-                } catch (ClassNotFoundException ignored) {}
+                } catch (ClassNotFoundException e) {
+                    throw new RuntimeException("CRITICAL: PostgreSQL JDBC Driver not found on classpath!", e);
+                }
 
+                // Connect to PostgreSQL and initialize connection pool
                 Connection initialConn = DriverManager.getConnection(this.cleanJdbcUrl, this.dbProps);
                 if (initialConn != null && !initialConn.isClosed()) {
                     this.postgresConnected = true;
                     connectionPool.offer(initialConn);
                     currentPoolSize.set(1);
                     System.out.println("🐘 DatabaseManager: Real PostgreSQL Connection Pool initialized (Pool Capacity: " + MAX_POOL_SIZE + ").");
+                } else {
+                    throw new SQLException("Initial PostgreSQL connection returned null or closed");
                 }
             } catch (Exception e) {
-                System.err.println("⚠️ DatabaseManager notice: PostgreSQL connection failed (" + e.getMessage() + "). Operating in local JSON fallback mode.");
+                System.err.println("❌ CRITICAL DATABASE ERROR: Failed to connect to PostgreSQL database specified in DATABASE_URL: " + e.getMessage());
                 this.postgresConnected = false;
+                throw new RuntimeException("CRITICAL STARTUP ERROR: PostgreSQL connection failed with DATABASE_URL configured. Refusing to start in production without a valid database connection: " + e.getMessage(), e);
             }
         } else {
+            if ("production".equalsIgnoreCase(System.getenv("NODE_ENV")) || System.getenv("RENDER") != null) {
+                System.err.println("⚠️ WARNING: Running in production mode without DATABASE_URL configured.");
+            }
             System.out.println("📦 DatabaseManager: DATABASE_URL not set. Running in local JSON storage mode (server/data/*.json).");
         }
     }
@@ -89,16 +99,33 @@ public class DatabaseManager {
         return instance;
     }
 
+    public static synchronized void resetInstanceForTesting() {
+        if (instance != null) {
+            for (Connection c : instance.connectionPool) {
+                try { c.close(); } catch (Exception ignored) {}
+            }
+            instance.connectionPool.clear();
+            instance.currentPoolSize.set(0);
+            instance = null;
+        }
+    }
+
     public boolean isPostgres() {
         return postgresConnected;
     }
 
+    public int getCurrentPoolSize() {
+        return currentPoolSize.get();
+    }
+
     /**
-     * Borrow a validated connection from the connection pool
+     * Borrow a validated connection from the connection pool.
+     * Strictly capped at MAX_POOL_SIZE live connections.
      */
     public Connection getConnection() throws SQLException {
         if (!postgresConnected || cleanJdbcUrl == null) return null;
 
+        // 1. Try to reuse a connection already in the pool
         Connection conn = connectionPool.poll();
         if (conn != null) {
             try {
@@ -106,27 +133,37 @@ public class DatabaseManager {
                     return conn;
                 }
             } catch (SQLException ignored) {}
-            currentPoolSize.decrementAndGet();
+            currentPoolSize.updateAndGet(c -> Math.max(0, c - 1));
         }
 
-        // If pool is below capacity, allocate new connection
-        if (currentPoolSize.get() < MAX_POOL_SIZE) {
-            currentPoolSize.incrementAndGet();
-            try {
-                return DriverManager.getConnection(cleanJdbcUrl, dbProps);
-            } catch (SQLException e) {
-                currentPoolSize.decrementAndGet();
-                throw e;
+        // 2. If pool has not reached MAX_POOL_SIZE, create a new one under synchronization
+        synchronized (currentPoolSize) {
+            if (currentPoolSize.get() < MAX_POOL_SIZE) {
+                Connection newConn = DriverManager.getConnection(cleanJdbcUrl, dbProps);
+                currentPoolSize.incrementAndGet();
+                return newConn;
             }
         }
 
-        // Wait briefly for a connection to return to the pool
+        // 3. Pool is at capacity. Strictly wait for an existing connection to be returned
         try {
-            conn = connectionPool.poll(3, TimeUnit.SECONDS);
-            if (conn != null && !conn.isClosed() && conn.isValid(2)) {
-                return conn;
+            conn = connectionPool.poll(5, TimeUnit.SECONDS);
+            if (conn != null) {
+                try {
+                    if (!conn.isClosed() && conn.isValid(2)) {
+                        return conn;
+                    }
+                } catch (SQLException ignored) {}
+                currentPoolSize.updateAndGet(c -> Math.max(0, c - 1));
+
+                // Replace invalid connection within pool limits
+                synchronized (currentPoolSize) {
+                    Connection newConn = DriverManager.getConnection(cleanJdbcUrl, dbProps);
+                    currentPoolSize.incrementAndGet();
+                    return newConn;
+                }
             }
-            return DriverManager.getConnection(cleanJdbcUrl, dbProps);
+            throw new SQLException("PostgreSQL connection pool exhausted. Maximum (" + MAX_POOL_SIZE + ") active connections in use.");
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new SQLException("Database connection acquisition interrupted", e);
@@ -137,15 +174,20 @@ public class DatabaseManager {
      * Return a connection back to the connection pool
      */
     public void releaseConnection(Connection conn) {
-        if (conn != null && postgresConnected) {
-            try {
-                if (!conn.isClosed() && conn.isValid(2) && connectionPool.size() < MAX_POOL_SIZE) {
-                    connectionPool.offer(conn);
+        if (conn == null || !postgresConnected) return;
+
+        try {
+            if (!conn.isClosed() && conn.isValid(2)) {
+                if (connectionPool.offer(conn)) {
                     return;
                 }
-                conn.close();
-            } catch (SQLException ignored) {}
-            currentPoolSize.decrementAndGet();
+            }
+            conn.close();
+        } catch (SQLException ignored) {
+        } finally {
+            if (!connectionPool.contains(conn)) {
+                currentPoolSize.updateAndGet(c -> Math.max(0, c - 1));
+            }
         }
     }
 
@@ -156,7 +198,6 @@ public class DatabaseManager {
         if (rawUrl == null || rawUrl.trim().isEmpty()) return null;
         String trimmed = rawUrl.trim();
         if (trimmed.startsWith("jdbc:")) {
-            // Strip credentials if present in JDBC URL query string to prevent duplicate param issues
             int queryIdx = trimmed.indexOf("?");
             return (queryIdx > 0) ? trimmed.substring(0, queryIdx) : trimmed;
         }
@@ -238,21 +279,27 @@ public class DatabaseManager {
     }
 
     /**
-     * Externalized 256-bit AES Vault Key derived deterministically via SHA-256
+     * Externalized 256-bit AES Vault Key derived deterministically via SHA-256.
+     * Mandatory in production mode; refuses to start if missing in production.
      */
     private static byte[] getEncryptionKeyBytes() {
         String envKey = System.getenv("VAULT_ENCRYPTION_KEY");
+        boolean isProduction = "production".equalsIgnoreCase(System.getenv("NODE_ENV")) 
+                            || System.getenv("DATABASE_URL") != null 
+                            || System.getenv("RENDER") != null;
+
         if (envKey == null || envKey.trim().isEmpty()) {
-            if ("production".equalsIgnoreCase(System.getenv("NODE_ENV")) || System.getenv("RENDER") != null) {
-                System.err.println("⚠️ SECURITY ALERT: VAULT_ENCRYPTION_KEY is not configured in production environment variables!");
+            if (isProduction) {
+                throw new IllegalStateException("CRITICAL SECURITY ERROR: VAULT_ENCRYPTION_KEY environment variable is mandatory in production but was not set.");
             }
-            envKey = "ApnaVaidya_2026_Enterprise_AES256_Vault_Key_Production_98234!";
+            // Explicit non-production local development key only
+            envKey = "LOCAL_DEVELOPMENT_ONLY_INSECURE_SECRET_KEY_NOT_FOR_PRODUCTION";
         }
         try {
             MessageDigest sha = MessageDigest.getInstance("SHA-256");
             return sha.digest(envKey.trim().getBytes(StandardCharsets.UTF_8));
         } catch (Exception e) {
-            return "ApnaVaidya2026AES256HealthVaultK".getBytes(StandardCharsets.UTF_8);
+            throw new RuntimeException("Failed to derive AES key via SHA-256", e);
         }
     }
 
@@ -264,6 +311,8 @@ public class DatabaseManager {
      * Read table data from local JSON file (local dev fallback)
      */
     public String loadTableData(String tableName) {
+        if (postgresConnected) return null;
+
         ReentrantReadWriteLock.ReadLock readLock = getLock(tableName).readLock();
         readLock.lock();
         try {
@@ -284,6 +333,8 @@ public class DatabaseManager {
      * Write table data with atomic swap and exclusive write lock (local dev fallback)
      */
     public void saveTableData(String tableName, String jsonData) {
+        if (postgresConnected) return; // Do not write to local JSON files in production
+
         ReentrantReadWriteLock.WriteLock writeLock = getLock(tableName).writeLock();
         writeLock.lock();
         try {

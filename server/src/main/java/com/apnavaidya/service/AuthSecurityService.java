@@ -20,14 +20,24 @@ import java.util.Map;
  */
 public class AuthSecurityService {
 
-    private static final String DEFAULT_DEV_SECRET = "ApnaVaidya_2026_Secure_Secret_Key_Health_Care_JWT_Signature_98234!";
+    private static final String DEFAULT_DEV_SECRET = "LOCAL_DEVELOPMENT_ONLY_INSECURE_JWT_SECRET_KEY_NOT_FOR_PROD";
     private static final SecureRandom secureRandom = new SecureRandom();
     private static final int PBKDF2_ITERATIONS = 100000;
     private static final int KEY_LENGTH = 256;
 
     public static String getJwtSecret() {
         String envSecret = System.getenv("JWT_SECRET");
-        return (envSecret != null && !envSecret.trim().isEmpty()) ? envSecret.trim() : DEFAULT_DEV_SECRET;
+        boolean isProduction = "production".equalsIgnoreCase(System.getenv("NODE_ENV")) 
+                            || System.getenv("DATABASE_URL") != null 
+                            || System.getenv("RENDER") != null;
+
+        if (envSecret == null || envSecret.trim().isEmpty()) {
+            if (isProduction) {
+                throw new IllegalStateException("CRITICAL SECURITY ERROR: JWT_SECRET environment variable is mandatory in production but was not set.");
+            }
+            return DEFAULT_DEV_SECRET;
+        }
+        return envSecret.trim();
     }
 
     public static boolean isDemoPasswordValid(String password) {
