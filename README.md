@@ -21,7 +21,7 @@
 | Platform | Deployment Target | Role | Live Link |
 | :--- | :--- | :--- | :--- |
 | **⚡ Vercel** | **Edge CDN Web App** | React 18 Frontend UI & On-Device OCR | [`https://apnavaidya.vercel.app`](https://apnavaidya.vercel.app) |
-| **🐳 Render** | **Docker Web Service** | Java 17 REST API + PostgreSQL | [`https://apna-vaidya-backend.onrender.com`](https://apna-vaidya-backend.onrender.com) |
+| **🐳 Render** | **Docker Web Service** | Java 17 REST API + PostgreSQL | [`https://apna-vaidya.onrender.com`](https://apna-vaidya.onrender.com) |
 
 ---
 
@@ -153,7 +153,7 @@ ApnaVaidya utilizes a **Hybrid Relational Repository Architecture**:
 
 | Variable | Required | Description | Example / Default |
 | :--- | :---: | :--- | :--- |
-| `VITE_API_URL` | Production (Frontend) | URL of the Java backend REST API on Render | `https://apna-vaidya-backend.onrender.com` |
+| `VITE_API_URL` | Production (Frontend) | URL of the Java backend REST API on Render | `https://apna-vaidya.onrender.com` |
 | `DATABASE_URL` | Production (Backend) | PostgreSQL database connection string | `postgresql://user:pass@host:5432/apnavaidya` |
 | `JWT_SECRET` | Production (Backend) | 256-bit secret key for HMAC-SHA256 JWT tokens | Auto-generated or custom random string |
 | `VAULT_ENCRYPTION_KEY` | Production (Backend) | 256-bit secret key for AES-256 GCM encrypted fields | Auto-generated or custom random string |
@@ -228,7 +228,7 @@ npm run test:all
    - `JWT_SECRET`: Generate a random 32-character secret
    - `VAULT_ENCRYPTION_KEY`: Generate a random 32-character secret
    - `ALLOWED_ORIGINS`: `https://your-app.vercel.app,http://localhost:5173`
-5. Click **Deploy Web Service**. Your backend will be live at `https://apna-vaidya-backend.onrender.com`.
+5. Click **Deploy Web Service**. Your backend will be live at `https://apna-vaidya.onrender.com`.
 
 ### B. Deploy React Frontend on Vercel
 
@@ -236,7 +236,7 @@ npm run test:all
 2. Click **Add New...** ➔ **Project** ➔ Import `tanvi0404/ApnaVaidya`.
 3. Framework Preset: **Vite** (Root Directory: `./`).
 4. In **Environment Variables**, add:
-   - `VITE_API_URL`: `https://apna-vaidya-backend.onrender.com` (Your Render backend URL)
+   - `VITE_API_URL`: `https://apna-vaidya.onrender.com` (Your Render backend URL)
 5. Click **Deploy**. Vercel will build the SPA and deploy it globally with full PWA and caching support!
 
 ---
